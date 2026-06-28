@@ -1,0 +1,47 @@
+services:
+  # ─── BANCO DE DADOS (POSTGRESQL 16) ─────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: sweet_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sweet_admin
+      POSTGRES_PASSWORD: secure_password_2026
+      POSTGRES_DB: sweetaffinity
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  # ─── CACHE E RATE LIMITING (REDIS 7) ────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: sweet_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+
+  # ─── STORAGE LOCAL DE FOTOS (MINIO S3 OPENSOURCE) ───────
+  minio:
+    image: minio/minio
+    container_name: sweet_minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: sweet_minio_access_key
+      MINIO_ROOT_PASSWORD: sweet_minio_secret_key_strong_2026
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+
+volumes:
+  pgdata:
+    driver: local
+  redisdata:
+    driver: local
+  minio-data:
+    driver: local
