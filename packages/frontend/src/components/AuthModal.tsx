@@ -63,9 +63,9 @@ const professionOptions = [
     'Outro',
 ].sort();
 
-
 const AuthModal: React.FC<AuthModalProps> = ({ onClose, initialMode, onRegistrationComplete, onLoginSuccess, navigateTo }) => {
     const [mode, setMode] = useState(initialMode);
+    const API_URL = 'http://localhost:4000'; // Endereço do nosso servidor Fastify local
 
     // Registration state
     const [birthDate, setBirthDate] = useState('');
@@ -76,12 +76,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, initialMode, onRegistrat
     const [isLoadingCities, setIsLoadingCities] = useState(false);
     const [termsAccepted, setTermsAccepted] = useState(false);
     const [isCompletingGoogleSignUp, setIsCompletingGoogleSignUp] = useState(false);
+    const [registerError, setRegisterError] = useState('');
 
     // Login state
     const [loginEmail, setLoginEmail] = useState('');
     const [loginPassword, setLoginPassword] = useState('');
     const [loginError, setLoginError] = useState('');
-
 
     useEffect(() => {
         if (mode === 'register') {
@@ -138,11 +138,15 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, initialMode, onRegistrat
 
     const isSubmitDisabled = ageError !== '' || !birthDate || !termsAccepted;
     
-    const handleRegistrationSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    // CONEXÃO REAL: Endpoint de Cadastro do Servidor Fastify
+    const handleRegistrationSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (isSubmitDisabled) return;
+        setRegisterError('');
         
         const formData = new FormData(e.currentTarget);
+        const email = formData.get('email') as string;
+        const password = formData.get('password') as string;
         const profileTypeRaw = formData.get('profile-type') as string;
 
         const profileTypeMap: { [key: string]: 'Baby' | 'Daddy' | 'Mommy' } = {
@@ -153,24 +157,80 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, initialMode, onRegistrat
         
         const profileType = profileTypeMap[profileTypeRaw] || 'Baby';
         
-        onRegistrationComplete(profileType);
+        // Coleta todos os campos adicionais do estilo de vida para enviar à API
+        const payload = {
+            email,
+            password,
+            profile_type: profileType,
+            display_name: email.split('@')[0],
+            birth_date: birthDate,
+            state: formData.get('state'),
+            city: formData.get('city'),
+            gender: formData.get('seeking-type'),
+            marital_status: formData.get('marital-status'),
+            height_range: formData.get('height'),
+            ethnicity: formData.get('ethnicity'),
+            hair_color: formData.get('hair-color'),
+            eye_color: formData.get('eye-color'),
+            smoking: formData.get('smoking'),
+            drinking: formData.get('drinking'),
+            education: formData.get('education'),
+            profession: formData.get('occupation'),
+            income_range: formData.get('income')
+        };
+
+        try {
+            const response = await fetch(`${API_URL}/auth/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Falha ao processar o cadastro.');
+            }
+
+            if (data.token) {
+                localStorage.setItem('sweet_token', data.token);
+            }
+
+            onRegistrationComplete(profileType);
+        } catch (error: any) {
+            setRegisterError(error.message || 'Erro de conexão com o servidor.');
+        }
     };
 
-    const handleLoginSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    // CONEXÃO REAL: Endpoint de Login do Servidor Fastify
+    const handleLoginSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setLoginError('');
-        // Simulating login API call
-        if (loginEmail === 'daddy@sweetaffinity.com' && loginPassword === 'password123') {
+
+        try {
+            const response = await fetch(`${API_URL}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: loginEmail, password: loginPassword })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'E-mail ou senha inválidos.');
+            }
+
+            // Armazena com segurança o token de sessão localmente
+            localStorage.setItem('sweet_token', data.token);
             onLoginSuccess();
-        } else {
-            setLoginError('Email ou senha inválidos. Tente novamente.');
+        } catch (error: any) {
+            setLoginError(error.message || 'Erro ao conectar à API.');
         }
     };
     
     const handleGoogleSignUp = () => {
-        // In a real app, this triggers Google OAuth. For simulation, switch to complete profile.
-        setMode('register');
-        setIsCompletingGoogleSignUp(true);
+        // Redireciona para o fluxo OAuth do nosso backend Fastify
+        window.location.href = `${API_URL}/auth/google`;
     };
     
     const renderLogin = () => (
@@ -213,11 +273,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, initialMode, onRegistrat
                     />
                 </FormField>
                 {loginError && <p className="text-red-500 text-sm text-center bg-red-50 p-3 rounded-lg">{loginError}</p>}
-                 <div className="text-xs text-gray-500 text-center bg-gray-50 p-3 rounded-md">
-                    <p><strong>Para fins de demonstração:</strong></p>
-                    <p>Email: <code className="font-mono">daddy@sweetaffinity.com</code></p>
-                    <p>Senha: <code className="font-mono">password123</code></p>
-                </div>
                 <button 
                     type="submit" 
                     className="w-full mt-4 bg-gradient-to-r from-gradient-pink to-gradient-orange text-white font-semibold py-3 px-4 rounded-lg hover:opacity-90 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gradient-pink"
@@ -375,6 +430,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, initialMode, onRegistrat
                 Eu li, concordo com os <button type="button" onClick={() => { onClose(); navigateTo('terms'); }} className="font-medium text-gradient-pink hover:text-gradient-orange underline">Termos de Uso</button> e confirmo que tenho 18 anos ou mais.
                 </label>
             </div>
+            {registerError && <p className="text-red-500 text-sm text-center bg-red-50 p-3 rounded-lg mt-4">{registerError}</p>}
             <button 
                 type="submit" 
                 className="w-full mt-4 bg-gradient-to-r from-gradient-pink to-gradient-orange text-white font-semibold py-3 px-4 rounded-lg hover:opacity-90 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gradient-pink disabled:opacity-50 disabled:cursor-not-allowed"

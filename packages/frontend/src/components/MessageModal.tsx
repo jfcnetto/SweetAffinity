@@ -1,62 +1,55 @@
 import React, { useState, useRef, useEffect } from 'react';
-import type { Profile, Message } from '../types';
+import { io, Socket } from 'socket.io-client';
+import type { Profile } from '../types';
 
-// Phone number detection logic, rewritten for robustness.
+// Interface adaptada para coincidir com o modelo relacional de banco local
+interface DBMessage {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  content: string;
+  created_at: string;
+}
+
+// Phone number detection logic mantida perfeitamente intacta
 const containsPhoneNumber = (context: string, currentMessage: string): boolean => {
-    // Extensive map of number words to digits.
     const numberMap: { [key: string]: string } = {
         'zero': '0', 'um': '1', 'hum': '1', 'uma': '1', 'dois': '2', 'tres': '3',
         'quatro': '4', 'cinco': '5', 'seis': '6', 'meia': '6', 'sete': '7',
         'oito': '8', 'nove': '9', 'nono': '9', 'dez': '10'
     };
-
-    const normalizeText = (str: string) => str
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "");
-
+    const normalizeText = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     const numberWordsRegex = new RegExp(Object.keys(numberMap).join('|'), 'g');
-    
     const convertToDigits = (str: string) => normalizeText(str).replace(numberWordsRegex, match => numberMap[match]);
 
-    // RULE 1: AGGRESSIVE IMMEDIATE CHECK on the current message.
-    // This blocks short, number-heavy messages like "2", "36", "nove".
     const currentMsgWithDigits = convertToDigits(currentMessage);
     const currentMsgDigitsOnly = currentMsgWithDigits.replace(/\D/g, '');
     const currentMsgNonNumericChars = convertToDigits(currentMessage).replace(/[\d\s]/g, '');
 
-    // Heuristic: If the message has numbers, has very few other letters, and is short, it's suspicious.
     if (currentMsgDigitsOnly.length > 0 && currentMsgNonNumericChars.length < 4 && currentMessage.length < 30) {
         return true;
     }
-
-    // RULE 2: CONTEXT CHECK on the conversation history.
-    // This catches numbers built up over several messages.
     const textWithDigits = convertToDigits(context);
     const fullDigitString = textWithDigits.replace(/\D/g, '');
-    const PHONE_NUMBER_LENGTH_THRESHOLD = 8;
-    const phoneNumberRegex = new RegExp(`\\d{${PHONE_NUMBER_LENGTH_THRESHOLD},}`);
-    if (phoneNumberRegex.test(fullDigitString)) {
+    if (/\d{8,}/.test(fullDigitString)) {
         return true;
     }
-
     return false;
 };
 
-
-// Component props
 interface MessageModalProps {
   recipient: Profile;
   onClose: () => void;
   isPremiumUser: boolean;
   navigateTo: (page: string) => void;
   currentUserType: 'Baby' | 'Daddy' | 'Mommy';
+  currentUserId: string; // Adicionado ID do usuário atual logado na sessão
 }
 
 const EMOJIS = ['😊', '😂', '❤️', '😍', '👍', '🙏', '😘', '🥰', '🎉', '🔥', '🤔', '😎', '💖', '😉', '😜', '💋', '👋', '🌹', '✨', '👀'];
 
 const EmojiPicker: React.FC<{ onSelect: (emoji: string) => void }> = ({ onSelect }) => (
-  <div className="absolute bottom-full mb-2 bg-white shadow-lg rounded-lg p-2 grid grid-cols-5 gap-2 w-48 border border-gray-200 animate-fade-in-up-fast z-10">
+  <div className="absolute bottom-full mb-2 bg-white shadow-lg rounded-lg p-2 grid grid-cols-5 gap-2 w-48 border border-gray-200 z-10 animate-fade-in">
     {EMOJIS.map(emoji => (
       <button key={emoji} onClick={() => onSelect(emoji)} className="text-2xl hover:bg-gray-200 rounded-md transition-colors">
         {emoji}
@@ -65,13 +58,14 @@ const EmojiPicker: React.FC<{ onSelect: (emoji: string) => void }> = ({ onSelect
   </div>
 );
 
-const MessageBubble: React.FC<{ message: Message }> = ({ message }) => {
-    const isSentByMe = message.sender === 'me';
+const MessageBubble: React.FC<{ message: DBMessage; currentUserId: string }> = ({ message, currentUserId }) => {
+    const isSentByMe = message.sender_id === currentUserId;
+    const timeFormatted = new Date(message.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     return (
         <div className={`flex w-full ${isSentByMe ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-xs md:max-w-md lg:max-w-lg px-4 py-3 rounded-2xl shadow-sm ${isSentByMe ? 'bg-gradient-to-r from-gradient-pink to-gradient-orange text-white rounded-br-none' : 'bg-gray-200 text-dark-gray rounded-bl-none'}`}>
-                <p className="text-sm break-words">{message.text}</p>
-                <p className={`text-xs mt-1 ${isSentByMe ? 'text-gray-200' : 'text-gray-500'} text-right`}>{message.timestamp}</p>
+                <p className="text-sm break-words">{message.content}</p>
+                <p className={`text-xs mt-1 ${isSentByMe ? 'text-gray-200' : 'text-gray-500'} text-right`}>{timeFormatted}</p>
             </div>
         </div>
     );
@@ -91,21 +85,71 @@ const UpgradePrompt: React.FC<{ onUpgrade: () => void }> = ({ onUpgrade }) => (
     </div>
 );
 
-// Main Component
-const MessageModal: React.FC<MessageModalProps> = ({ recipient, onClose, isPremiumUser, navigateTo, currentUserType }) => {
-    const [messages, setMessages] = useState<Message[]>([]);
+const MessageModal: React.FC<MessageModalProps> = ({ recipient, onClose, isPremiumUser, navigateTo, currentUserType, currentUserId }) => {
+    const [messages, setMessages] = useState<DBMessage[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [error, setError] = useState<{ message: string; showUpgrade: boolean } | null>(null);
     const [showEmojis, setShowEmojis] = useState(false);
+    const socketRef = useRef<Socket | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const emojiPickerRef = useRef<HTMLDivElement>(null);
     const modalRef = useRef<HTMLDivElement>(null);
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    };
+    const API_URL = 'http://localhost:4000';
 
-    useEffect(scrollToBottom, [messages]);
+    // 1. CARREGAR HISTÓRICO PERSISTENTE DO BANCO DE DADOS LOCAL
+    useEffect(() => {
+        const fetchHistory = async () => {
+            const token = localStorage.getItem('sweet_token');
+            if (!token) return;
+
+            try {
+                const response = await fetch(`${API_URL}/messages/history/${recipient.id}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    setMessages(data);
+                }
+            } catch (err) {
+                console.error('Erro ao buscar histórico de mensagens:', err);
+            }
+        };
+
+        fetchHistory();
+    }, [recipient.id]);
+
+    // 2. ACIONAMENTO DA CONEXÃO WEBSOCKET EM TEMPO REAL VIA SOCKET.IO
+    useEffect(() => {
+        socketRef.current = io(API_URL);
+
+        // Comunica ao servidor quem está logando neste canal
+        socketRef.current.emit('register_user', currentUserId);
+
+        // Escuta novas mensagens direcionadas ao usuário atual em tempo real
+        socketRef.current.on('receive_message', (message: DBMessage) => {
+            if (message.sender_id === recipient.id) {
+                setMessages(prev => [...prev, message]);
+            }
+        });
+
+        // Escuta confirmação de entrega segura da mensagem enviada
+        socketRef.current.on('message_sent_confirm', (message: DBMessage) => {
+            setMessages(prev => [...prev, message]);
+        });
+
+        socketRef.current.on('message_error', (err: { error: string }) => {
+            setError({ message: err.error, showUpgrade: false });
+        });
+
+        return () => {
+            socketRef.current?.disconnect();
+        };
+    }, [currentUserId, recipient.id]);
+
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages]);
     
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -117,28 +161,13 @@ const MessageModal: React.FC<MessageModalProps> = ({ recipient, onClose, isPremi
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    useEffect(() => {
-        const preventDefault = (e: Event) => e.preventDefault();
-        const modalEl = modalRef.current;
-
-        if (modalEl) {
-            modalEl.addEventListener('contextmenu', preventDefault);
-        }
-
-        return () => {
-            if (modalEl) {
-                modalEl.removeEventListener('contextmenu', preventDefault);
-            }
-        }
-    }, []);
-
     const handleSendMessage = () => {
-        if (!newMessage.trim() || !isPremiumUser) return;
+        if (!newMessage.trim() || !isPremiumUser || !socketRef.current) return;
         
         const recentMyMessages = messages
-            .filter(m => m.sender === 'me')
+            .filter(m => m.sender_id === currentUserId)
             .slice(-10) 
-            .map(m => m.text)
+            .map(m => m.content)
             .join(' ');
         
         const contextToCheck = `${recentMyMessages} ${newMessage}`;
@@ -158,13 +187,13 @@ const MessageModal: React.FC<MessageModalProps> = ({ recipient, onClose, isPremi
              return;
         }
 
-        const messageToSend: Message = {
-            id: Date.now(),
-            text: newMessage,
-            timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-            sender: 'me',
-        };
-        setMessages([...messages, messageToSend]);
+        // Envia os dados estruturados pelo barramento de WebSockets do Socket.IO
+        socketRef.current.emit('send_message', {
+            sender_id: currentUserId,
+            receiver_id: recipient.id,
+            content: newMessage.trim()
+        });
+
         setNewMessage('');
         setError(null);
         setShowEmojis(false);
@@ -183,18 +212,21 @@ const MessageModal: React.FC<MessageModalProps> = ({ recipient, onClose, isPremi
         e.preventDefault();
     };
 
+    // Fallback de imagem idêntico ao do ProfileCard
+    const recipientImage = recipient.primary_photo_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=60';
+
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-0 sm:p-4 animate-fade-in">
             <div 
                 ref={modalRef}
-                className="bg-white rounded-none sm:rounded-2xl shadow-2xl w-full h-full sm:max-w-lg sm:h-[90vh] flex flex-col transform transition-all animate-fade-in-down overflow-hidden"
+                className="bg-white rounded-none sm:rounded-2xl shadow-2xl w-full h-full sm:max-w-lg sm:h-[90vh] flex flex-col transform transition-all overflow-hidden"
             >
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0">
                     <div className="flex items-center gap-3">
-                        <img src={recipient.imageUrls[0]} alt={recipient.name} className="w-12 h-12 rounded-full object-cover" />
+                        <img src={recipientImage} alt={recipient.display_name} className="w-12 h-12 rounded-full object-cover" />
                         <div>
-                            <h3 className="font-bold text-lg">{recipient.name}</h3>
+                            <h3 className="font-bold text-lg">{recipient.display_name}</h3>
                             <p className="text-sm text-green-500 flex items-center gap-1.5">
                                 <span className="relative flex h-2 w-2">
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
@@ -212,11 +244,10 @@ const MessageModal: React.FC<MessageModalProps> = ({ recipient, onClose, isPremi
                 {/* Messages */}
                 <div className="flex-grow p-4 overflow-y-auto bg-gray-50 relative">
                     <div className="space-y-4 flex flex-col relative z-[1]">
-                        {messages.map(msg => <MessageBubble key={msg.id} message={msg} />)}
+                        {messages.map(msg => <MessageBubble key={msg.id} message={msg} currentUserId={currentUserId} />)}
                     </div>
                     <div ref={messagesEndRef} />
                 </div>
-
 
                 {/* Footer / Input */}
                 <div className="flex-shrink-0">

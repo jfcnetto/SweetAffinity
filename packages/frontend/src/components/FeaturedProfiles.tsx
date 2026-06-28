@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Profile } from '../types';
 import ProfileCard from './ProfileCard';
@@ -11,7 +10,8 @@ interface FeaturedProfilesProps {
 
 const FeaturedProfiles: React.FC<FeaturedProfilesProps> = ({ sectionTitle, profiles, onProfileClick }) => {
   const [activeTab, setActiveTab] = useState('destaques');
-  const [favoritedProfiles, setFavoritedProfiles] = useState<number[]>(() => {
+  // Alterado para string[] porque agora usamos UUIDs (strings) do nosso banco local
+  const [favoritedProfiles, setFavoritedProfiles] = useState<string[]>(() => {
     try {
         const saved = localStorage.getItem('favoritedProfiles');
         return saved ? JSON.parse(saved) : [];
@@ -25,7 +25,7 @@ const FeaturedProfiles: React.FC<FeaturedProfilesProps> = ({ sectionTitle, profi
     localStorage.setItem('favoritedProfiles', JSON.stringify(favoritedProfiles));
   }, [favoritedProfiles]);
 
-  const handleToggleFavorite = (profileId: number) => {
+  const handleToggleFavorite = (profileId: string) => {
     setFavoritedProfiles(prev =>
       prev.includes(profileId)
         ? prev.filter(id => id !== profileId)
@@ -37,13 +37,16 @@ const FeaturedProfiles: React.FC<FeaturedProfilesProps> = ({ sectionTitle, profi
     const profilesCopy = [...profiles];
     switch (activeTab) {
       case 'destaques':
-        return profilesCopy.sort((a, b) => b.popularity - a.popularity);
+        // Atualizado para usar o campo correto: popularity_score
+        return profilesCopy.sort((a, b) => b.popularity_score - a.popularity_score);
       case 'novos':
-        const oneDayAgo = new Date();
-        oneDayAgo.setDate(oneDayAgo.getDate() - 1);
-        return profilesCopy.filter(p => new Date(p.registeredDate) > oneDayAgo);
+        // Filtra perfis cadastrados nos últimos 7 dias usando a estampa de tempo do nosso Postgres
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        return profilesCopy.filter(p => new Date(p.updated_at) > sevenDaysAgo);
       case 'proximos':
-        return profilesCopy.sort((a, b) => a.distance - b.distance);
+        // Ordena por cidade em ordem alfabética local como critério de proximidade em ambiente de desenvolvimento
+        return profilesCopy.sort((a, b) => (a.city || '').localeCompare(b.city || ''));
       case 'favoritos':
         return profiles.filter(p => favoritedProfiles.includes(p.id));
       default:
@@ -75,7 +78,7 @@ const FeaturedProfiles: React.FC<FeaturedProfilesProps> = ({ sectionTitle, profi
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {displayedProfiles.map(profile => (
               <div key={profile.id} className="relative">
-                <button onClick={() => onProfileClick(profile)} className="w-full text-left rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gradient-pink transition-all duration-300">
+                <div onClick={() => onProfileClick(profile)} className="w-full text-left rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gradient-pink transition-all duration-300 cursor-pointer">
                     <ProfileCard 
                         profile={profile} 
                         isFavorited={favoritedProfiles.includes(profile.id)}
@@ -84,7 +87,7 @@ const FeaturedProfiles: React.FC<FeaturedProfilesProps> = ({ sectionTitle, profi
                             handleToggleFavorite(profile.id);
                         }}
                     />
-                </button>
+                </div>
               </div>
             ))}
           </div>
