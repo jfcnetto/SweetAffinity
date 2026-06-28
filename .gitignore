@@ -1,0 +1,42 @@
+# ─── ARQUIVOS COMPILADOS E DEPENDÊNCIAS ──────────────────
+node_modules/
+/packages/frontend/node_modules/
+/packages/backend/node_modules/
+dist/
+dist-ssr/
+build/
+
+# ─── INFRAESTRUTURA LOCAL E VOLUMES (DOCKER) ─────────────
+# Impede que os dados locais do seu banco e mídias subam para o GitHub
+pgdata/
+redisdata/
+minio-data/
+certs/
+
+# ─── CONFIGURAÇÕES TRANSACIONAIS E SEGURANÇA ─────────────
+# Protege suas chaves da Stripe, JWT, banco de dados e APIs
+.env
+.env.local
+.env.production
+.env.development
+*.local
+
+# ─── LOGS DO SISTEMA ─────────────────────────────────────
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ─── DIAGNÓSTICOS E EDITORES (IDE) ───────────────────────
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

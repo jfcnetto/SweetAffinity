@@ -1,0 +1,41 @@
+NOME DO SITE: SweetAffinity.com
+https://dualite.dev/
+
+https://www.youware.com/project/b9dq4mpe01?enter_from=share&invite_code=IGMVBC8REZ
+
+supabase/functions/test-cors/index.ts
+ 
+VITE_SUPABASE_URL="https://becudksbpdrkclntkcgo.supabase.co"
+VITE_SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJlY3Vka3NicGRya2NsbnRrY2dvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcyODU2NTcsImV4cCI6MjA3Mjg2MTY1N30.11FnPgb3C82BDDhPLhgUGqupySOPoCeOdO30PnMIE6M"
+
+acidente300922
+
+Callback URL (for OAuth): https://becudksbpdrkclntkcgo.supabase.co/auth/v1/callback
+
+Client ID:658987960325-koc49cs6bmjfkf127g4pg255c4ge00gi.apps.googleusercontent.com
+Client secret: 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
+
+1. Prompt Sugerido para a Criação do Site
+
+Prompt (em português):
+
+Crie um site para uma plataforma de relacionamentos sugar, totalmente voltada ao público brasileiro, com foco em segurança, autenticidade e clareza. O site deve incluir:
+
+ Explicação clara dos perfis: Sugar Baby, Sugar Daddy e Sugar Mommy — seus objetivos, estilo de relacionamento e benefícios.
+ Processo de cadastro com verificação humana, exigindo dados reais e fotos, com aprovação prévia da equipe para garantir qualidade da comunidade.
+ Destaques de perfis ativos, como seções ilustrativas “Membros Sugar Babies ativos” e “Sugar Daddies/Mommies ativos”.
+ Conteúdo informativo: páginas com O que é Sugar Baby/Daddy, Como funciona, Blog com artigos (“vantagens”, “cuidados”, “segurança”), FAQ, e Sobre nós com valores da plataforma.
+ Políticas claras: regras contra trabalho sexual, orientações jurídicas, ênfase em consensualidade, respeito, comunicação honesta, e vulnerabilidades sociais.
+ Sistema de mensagens privadas, filtros (idade, interesses, localização), e alertas de segurança.
+ Opção de monetização via assinatura paga, com planos que ofereçam:
+
+   Verificação destacada (badge)
+   Perfis promovidos em destaque
+   Acesso a conteúdo exclusivo (artigos avançados, webinars, eventos online)
+   Funções extras (visores de quem visualizou, chat prioritário, indicadores de compatibilidade)
+ Design responsivo, seguro (SSL), com boas práticas de UX: navegação clara, termos de uso e política de privacidade acessíveis, notificações, e suporte ao vivo.
+
+Além disso, sugira opções de nomes de marca originais, curtos e fáceis de lembrar, que ainda tenham domínio .com disponível.
+
+
+

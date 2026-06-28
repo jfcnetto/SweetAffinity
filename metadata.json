@@ -1,0 +1,7 @@
+{
+  "name": "Sweet Affinity",
+  "description": "A sophisticated platform for sugar relationships in Brazil, focusing on security, authenticity, and clear expectations. Sweet Affinity connects Sugar Babies with Sugar Daddies and Mommies in a transparent and respectful environment.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
