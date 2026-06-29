@@ -1,42 +1,139 @@
-# ─── ARQUIVOS COMPILADOS E DEPENDÊNCIAS ──────────────────
-node_modules/
-/packages/frontend/node_modules/
-/packages/backend/node_modules/
-dist/
-dist-ssr/
-build/
+# ======================================================
+# DEPENDÊNCIAS
+# ======================================================
 
-# ─── INFRAESTRUTURA LOCAL E VOLUMES (DOCKER) ─────────────
-# Impede que os dados locais do seu banco e mídias subam para o GitHub
+node_modules/
+**/node_modules/
+
+# ======================================================
+# BUILD
+# ======================================================
+
+dist/
+build/
+coverage/
+dist-ssr/
+*.tsbuildinfo
+
+# ======================================================
+# CACHE
+# ======================================================
+
+.cache/
+.tmp/
+.temp/
+.eslintcache
+.parcel-cache/
+.vite/
+.turbo/
+
+# ======================================================
+# LOGS
+# ======================================================
+
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# ======================================================
+# AMBIENTES (.env)
+# ======================================================
+
+.env
+.env.local
+.env.development
+.env.production
+
+# O exemplo deve permanecer versionado
+!.env.example
+
+# ======================================================
+# DOCKER
+# ======================================================
+
+postgres_data/
+redis_data/
+minio_data/
+
 pgdata/
 redisdata/
 minio-data/
+
+docker-data/
+
+# ======================================================
+# CERTIFICADOS
+# ======================================================
+
 certs/
+*.pem
+*.crt
+*.key
 
-# ─── CONFIGURAÇÕES TRANSACIONAIS E SEGURANÇA ─────────────
-# Protege suas chaves da Stripe, JWT, banco de dados e APIs
-.env
-.env.local
-.env.production
-.env.development
-*.local
+# ======================================================
+# DRIZZLE
+# ======================================================
 
-# ─── LOGS DO SISTEMA ─────────────────────────────────────
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+drizzle/*.sqlite
+drizzle/meta/_journal.json
 
-# ─── DIAGNÓSTICOS E EDITORES (IDE) ───────────────────────
+# ======================================================
+# SENTRY
+# ======================================================
+
+.sentryclirc
+
+# ======================================================
+# IDEs
+# ======================================================
+
 .vscode/*
 !.vscode/extensions.json
+!.vscode/settings.json
+
 .idea/
+
+# ======================================================
+# SISTEMA OPERACIONAL
+# ======================================================
+
 .DS_Store
+Thumbs.db
+Desktop.ini
+
+# ======================================================
+# WINDOWS
+# ======================================================
+
 *.suo
-*.ntvs*
+*.user
+*.userossc
+*.sln.docstates
 *.njsproj
-*.sln
-*.sw?
+
+# ======================================================
+# SWAP
+# ======================================================
+
+*.swp
+*.swo
+*~
+
+# ======================================================
+# TESTES
+# ======================================================
+
+.nyc_output/
+coverage/
+
+# ======================================================
+# MISC
+# ======================================================
+
+*.seed
+*.pid
+*.pid.lock

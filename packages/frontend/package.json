@@ -1,20 +1,32 @@
 {
-  "name": "sweet-affinity",
-  "private": true,
+  "name": "@sweet-affinity/frontend",
   "version": "1.0.0",
-  "workspaces": [
-    "packages/*"
-  ],
+  "private": true,
+
+  "type": "module",
+
+  "engines": {
+    "node": ">=24.0.0",
+    "npm": ">=11.0.0"
+  },
+
   "scripts": {
-    "dev:frontend": "npm run dev -w packages/frontend",
-    "dev:backend": "npm run dev -w packages/backend",
-    "build:frontend": "npm run build -w packages/frontend",
-    "build:backend": "npm run build -w packages/backend"
+    "dev": "tsx watch src/index.ts",
+
+    "build": "tsc",
+
+    "typecheck": "tsc --noEmit"
   },
-  "devDependencies": {
-    "typescript": "~5.8.2"
-  },
+
   "dependencies": {
     "socket.io-client": "^4.8.3"
+  },
+
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+
+    "tsx": "^4.20.3",
+
+    "typescript": "^5.9.2"
   }
 }

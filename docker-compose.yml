@@ -1,47 +1,136 @@
+version: "3.9"
+
 services:
-  # ─── BANCO DE DADOS (POSTGRESQL 16) ─────────────────────
+
+  # ======================================================
+  # PostgreSQL
+  # ======================================================
+
   postgres:
     image: postgres:16-alpine
     container_name: sweet_postgres
+
     restart: unless-stopped
+
     environment:
       POSTGRES_USER: sweet_admin
       POSTGRES_PASSWORD: secure_password_2026
       POSTGRES_DB: sweetaffinity
+      TZ: America/Sao_Paulo
+
     ports:
       - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
 
-  # ─── CACHE E RATE LIMITING (REDIS 7) ────────────────────
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sweet_admin -d sweetaffinity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    networks:
+      - sweet_network
+
+  # ======================================================
+  # Redis
+  # ======================================================
+
   redis:
     image: redis:7-alpine
     container_name: sweet_redis
+
     restart: unless-stopped
+
+    command: redis-server --appendonly yes
+
     ports:
       - "6379:6379"
-    volumes:
-      - redisdata:/data
 
-  # ─── STORAGE LOCAL DE FOTOS (MINIO S3 OPENSOURCE) ───────
+    volumes:
+      - redis_data:/data
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    networks:
+      - sweet_network
+
+  # ======================================================
+  # MinIO
+  # ======================================================
+
   minio:
     image: minio/minio
     container_name: sweet_minio
+
     restart: unless-stopped
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+
     environment:
       MINIO_ROOT_USER: sweet_minio_access_key
       MINIO_ROOT_PASSWORD: sweet_minio_secret_key_strong_2026
-    volumes:
-      - minio-data:/data
+      TZ: America/Sao_Paulo
+
     command: server /data --console-address ":9001"
 
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+    volumes:
+      - minio_data:/data
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    networks:
+      - sweet_network
+
+# ======================================================
+# Volumes
+# ======================================================
+
 volumes:
-  pgdata:
+
+  postgres_data:
     driver: local
-  redisdata:
+
+  redis_data:
     driver: local
-  minio-data:
+
+  minio_data:
     driver: local
+
+# ======================================================
+# Network
+# ======================================================
+
+networks:
+
+  sweet_network:
+    driver: bridge

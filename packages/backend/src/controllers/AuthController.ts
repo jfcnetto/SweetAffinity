@@ -1,143 +1,269 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import bcrypt from 'bcrypt';
-import { pgPool } from '../index.js';
+import { FastifyPluginAsync } from "fastify";
+import bcrypt from "bcryptjs";
+import { eq } from "drizzle-orm";
 
-export const authRoutes = async (fastify: FastifyInstance) => {
+import { db } from "../../db/index.js";
+import { users, profiles } from "../../db/schema.js";
+import { AuthService } from "./auth.service.js";
 
-  // ─── ENDPOINT DE REGISTRO (SIGN UP) ──────────────────────────────────
-  fastify.post('/register', async (request: FastifyRequest, reply: FastifyReply) => {
-    const body = request.body as any;
-    const client = await pgPool.connect();
+// =====================================================
+// TYPES
+// =====================================================
 
-    try {
-      // 1. Verifica se o e-mail já está cadastrado
-      const userExists = await client.query('SELECT id FROM users WHERE email = $1', [body.email]);
-      if (userExists.rowCount && userExists.rowCount > 0) {
-        return reply.status(400).send({ message: 'Este e-mail já está cadastrado no sistema.' });
-      }
+interface RegisterBody {
+  email: string;
+  password: string;
+  profileType?: "Baby" | "Daddy" | "Mommy";
+  displayName?: string;
+  birthDate?: string;
+  state?: string;
+  city?: string;
+  gender?: "male" | "female" | "other";
+  maritalStatus?: "single" | "married" | "divorced" | "widowed";
+  heightRange?: string;
+  ethnicity?: string;
+  hairColor?: string;
+  eyeColor?: string;
+  smoking?: "yes" | "no" | "occasionally";
+  drinking?: "yes" | "no" | "occasionally";
+  education?: string;
+  profession?: string;
+  incomeRange?: string;
+}
 
-      // 2. Encripta a senha com segurança
-      const saltRounds = 10;
-      const passwordHash = await bcrypt.hash(body.password, saltRounds);
+interface LoginBody {
+  email: string;
+  password: string;
+}
 
-      // Inicia uma transação para garantir consistência relacional total
-      await client.query('BEGIN');
+interface RefreshBody {
+  refreshToken: string;
+}
 
-      // 3. Insere o Usuário Base
-      const userQuery = `
-        INSERT INTO users (email, password_hash, profile_type, status)
-        VALUES ($1, $2, $3, 'active')
-        RETURNING id, email, profile_type, is_verified, is_premium;
-      `;
-      const userResult = await client.query(userQuery, [
-        body.email,
-        passwordHash,
-        body.profile_type
-      ]);
+// =====================================================
+// HELPER — remove campos sensíveis antes de retornar
+// =====================================================
 
-      const newUser = userResult.rows[0];
+function sanitizeUser(user: Record<string, any>) {
+  const { passwordHash, ...safe } = user;
+  return safe;
+}
 
-      // 4. Insere o Perfil Avançado de Estilo de Vida e Aparência
-      const profileQuery = `
-        INSERT INTO profiles (
-          id, display_name, birth_date, state, city, gender, marital_status,
-          height_range, ethnicity, hair_color, eye_color, smoking, drinking,
-          education, profession, income_range
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16);
-      `;
-      
-      await client.query(profileQuery, [
-        newUser.id,
-        body.display_name,
-        body.birth_date,
-        body.state,
-        body.city,
-        body.gender, // "Busco por" mapeado para fins de busca relacional
-        body.marital_status,
-        body.height_range,
-        body.ethnicity,
-        body.hair_color,
-        body.eye_color,
-        body.smoking,
-        body.drinking,
-        body.education,
-        body.profession,
-        body.income_range
-      ]);
+// =====================================================
+// PLUGIN
+// =====================================================
 
-      await client.query('COMMIT');
+export const authRoutes: FastifyPluginAsync = async (fastify) => {
 
-      // 5. Gera o Token de Sessão JWT nativo assinado pelo Fastify
-      const token = fastify.jwt.sign({ 
-        id: newUser.id, 
-        email: newUser.email, 
-        profile_type: newUser.profile_type 
-      });
+  // ─────────────────────────────────────────────────
+  // POST /auth/register
+  // ─────────────────────────────────────────────────
+  fastify.post<{ Body: RegisterBody }>("/register", async (request, reply) => {
+    const body = request.body;
 
-      return reply.status(201).send({
-        message: 'Cadastro realizado com sucesso!',
-        token,
-        user: newUser
-      });
-
-    } catch (error) {
-      await client.query('ROLLBACK');
-      fastify.log.error(error);
-      return reply.status(500).send({ message: 'Erro interno ao processar o cadastro do usuário.' });
-    } finally {
-      client.release();
+    // FIX 1: validação mais completa
+    if (!body?.email || !body?.password) {
+      return reply.status(400).send({ message: "E-mail e senha são obrigatórios." });
     }
+
+    if (body.password.length < 8) {
+      return reply.status(400).send({ message: "A senha deve ter no mínimo 8 caracteres." });
+    }
+
+    // FIX 2: validação de +18 anos
+    if (body.birthDate) {
+      const birth = new Date(body.birthDate);
+      const today = new Date();
+      const age = today.getFullYear() - birth.getFullYear();
+      const monthDiff = today.getMonth() - birth.getMonth();
+      const realAge =
+        monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())
+          ? age - 1
+          : age;
+
+      if (realAge < 18) {
+        return reply.status(400).send({ message: "Você deve ter 18 anos ou mais para se cadastrar." });
+      }
+    }
+
+    const email = body.email.toLowerCase().trim();
+
+    const existingUser = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+
+    if (existingUser.length) {
+      return reply.status(409).send({ message: "E-mail já cadastrado." });
+    }
+
+    const passwordHash = await bcrypt.hash(body.password, 12); // FIX 3: custo 12 (não 10)
+
+    const result = await db.transaction(async (tx) => {
+      const [createdUser] = await tx
+        .insert(users)
+        .values({
+          email,
+          passwordHash,
+          profileType: body.profileType ?? null,
+          status: "pending",
+        })
+        .returning();
+
+      await tx.insert(profiles).values({
+        id: createdUser.id,
+        displayName: body.displayName ?? null,
+        birthDate: body.birthDate ?? null,
+        state: body.state ?? null,
+        city: body.city ?? null,
+        gender: body.gender ?? null,
+        maritalStatus: body.maritalStatus ?? null,
+        heightRange: body.heightRange ?? null,
+        ethnicity: body.ethnicity ?? null,
+        hairColor: body.hairColor ?? null,
+        eyeColor: body.eyeColor ?? null,
+        smoking: body.smoking ?? null,
+        drinking: body.drinking ?? null,
+        education: body.education ?? null,
+        profession: body.profession ?? null,
+        incomeRange: body.incomeRange ?? null,
+      });
+
+      return createdUser;
+    });
+
+    const accessToken = AuthService.generateAccessToken(fastify, result);
+    const refreshToken = await AuthService.generateRefreshToken(result.id);
+
+    // FIX 4: NUNCA retornar passwordHash ao cliente
+    return reply.status(201).send({
+      message: "Usuário registrado com sucesso.",
+      accessToken,
+      refreshToken,
+      user: sanitizeUser(result),
+    });
   });
 
-  // ─── ENDPOINT DE LOGIN (SIGN IN) ────────────────────────────────────
-  fastify.post('/login', async (request: FastifyRequest, reply: FastifyReply) => {
-    const { email, password } = request.body as any;
+  // ─────────────────────────────────────────────────
+  // POST /auth/login
+  // ─────────────────────────────────────────────────
+  fastify.post<{ Body: LoginBody }>("/login", async (request, reply) => {
+    const body = request.body;
 
-    try {
-      // 1. Busca o usuário pelo e-mail
-      const result = await pgPool.query('SELECT * FROM users WHERE email = $1', [email]);
-      if (result.rowCount === 0) {
-        return reply.status(401).send({ message: 'E-mail ou senha incorretos.' });
-      }
-
-      const user = result.rows[0];
-
-      // 2. Valida o status da conta
-      if (user.status === 'suspended' || user.status === 'banned') {
-        return reply.status(403).send({ message: `Esta conta está temporariamente ${user.status}.` });
-      }
-
-      // 3. Compara os hashes de senha com Bcrypt
-      const match = await bcrypt.compare(password, user.password_hash);
-      if (!match) {
-        return reply.status(401).send({ message: 'E-mail ou senha incorretos.' });
-      }
-
-      // 4. Atualiza a estampa de data/hora do último login
-      await pgPool.query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
-
-      // 5. Assina o Token JWT de Sessão
-      const token = fastify.jwt.sign({ 
-        id: user.id, 
-        email: user.email, 
-        profile_type: user.profile_type 
-      });
-
-      return reply.send({
-        message: 'Autenticação bem-succeeded!',
-        token,
-        user: {
-          id: user.id,
-          email: user.email,
-          profile_type: user.profile_type,
-          is_verified: user.is_verified,
-          is_premium: user.is_premium
-        }
-      });
-
-    } catch (error) {
-      fastify.log.error(error);
-      return reply.status(500).send({ message: 'Erro interno ao processar a autenticação.' });
+    if (!body?.email || !body?.password) {
+      return reply.status(400).send({ message: "E-mail e senha são obrigatórios." });
     }
+
+    const email = body.email.toLowerCase().trim();
+
+    const user = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+
+    // FIX 5: mesma mensagem para email inexistente e senha errada
+    // (evitar user enumeration attack)
+    if (!user.length) {
+      return reply.status(401).send({ message: "E-mail ou senha inválidos." });
+    }
+
+    const foundUser = user[0];
+
+    // FIX 6: verificar se conta está banida/suspensa antes de validar senha
+    if (foundUser.status === "banned") {
+      return reply.status(403).send({ message: "Esta conta foi suspensa. Entre em contato com o suporte." });
+    }
+
+    const validPassword = await bcrypt.compare(body.password, foundUser.passwordHash);
+
+    if (!validPassword) {
+      return reply.status(401).send({ message: "E-mail ou senha inválidos." });
+    }
+
+    // FIX 7: atualizar lastLoginAt no banco
+    await db
+      .update(users)
+      .set({ lastLoginAt: new Date() })
+      .where(eq(users.id, foundUser.id));
+
+    const accessToken = AuthService.generateAccessToken(fastify, foundUser);
+    const refreshToken = await AuthService.generateRefreshToken(foundUser.id);
+
+    // FIX 4: NUNCA retornar passwordHash
+    return reply.send({
+      message: "Login realizado com sucesso.",
+      accessToken,
+      refreshToken,
+      user: sanitizeUser(foundUser),
+    });
   });
+
+  // ─────────────────────────────────────────────────
+  // POST /auth/refresh
+  // ─────────────────────────────────────────────────
+  fastify.post<{ Body: RefreshBody }>("/refresh", async (request, reply) => {
+    const { refreshToken } = request.body;
+
+    if (!refreshToken) {
+      return reply.status(400).send({ message: "refreshToken é obrigatório." });
+    }
+
+    // FIX 8: rotateRefreshToken deve retornar { userId, newRefreshToken }
+    // e o endpoint deve retornar ambos os tokens
+    const { userId, newRefreshToken } = await AuthService.rotateRefreshToken(refreshToken);
+
+    const accessToken = fastify.jwt.sign(
+      { sub: userId },
+      { expiresIn: "15m" }
+    );
+
+    return reply.send({
+      accessToken,
+      refreshToken: newRefreshToken, // FIX 9: retornar o novo refresh token rotacionado
+    });
+  });
+
+  // ─────────────────────────────────────────────────
+  // GET /auth/me
+  // ─────────────────────────────────────────────────
+  // FIX 10: forma correta de usar jwtVerify no Fastify v4
+  fastify.get(
+    "/me",
+    {
+      onRequest: [fastify.authenticate], // usa o decorator, não preHandler inline
+    },
+    async (request, reply) => {
+      // FIX 11: buscar dados atuais do banco, não só o payload do JWT
+      const payload = request.user as { sub: string };
+
+      const user = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, payload.sub))
+        .limit(1);
+
+      if (!user.length) {
+        return reply.status(404).send({ message: "Usuário não encontrado." });
+      }
+
+      return reply.send({ user: sanitizeUser(user[0]) });
+    }
+  );
+
+  // ─────────────────────────────────────────────────
+  // POST /auth/logout
+  // ─────────────────────────────────────────────────
+  fastify.post(
+    "/logout",
+    { onRequest: [fastify.authenticate] },
+    async (request, reply) => {
+      // Invalidar o refresh token no Redis/banco
+      const payload = request.user as { sub: string };
+      await AuthService.revokeRefreshTokens(payload.sub);
+
+      return reply.send({ message: "Logout realizado com sucesso." });
+    }
+  );
 };
