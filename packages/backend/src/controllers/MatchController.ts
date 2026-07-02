@@ -166,6 +166,26 @@ export async function matchRoutes(app: FastifyInstance) {
             user1Id,
             user2Id,
           }).onConflictDoNothing({ target: [matches.user1Id, matches.user2Id] });
+
+          // (Opcional) Notificar ambos sobre o match
+          const { notifications } = await import("../db/schema.js");
+          await db.insert(notifications).values([
+            { userId: fromUserId, type: "match", title: "💖 Novo Match!", body: "Você deu um match! Vá para a aba de matches e mande uma mensagem.", link: "/matches" },
+            { userId: toUserId, type: "match", title: "💖 Novo Match!", body: "Você deu um match! Vá para a aba de matches e mande uma mensagem.", link: "/matches" }
+          ]);
+        } else {
+          // =====================================================
+          // FEATURE GROWTH: Admirador Secreto (Semelhante ao Tinder)
+          // Se deu like e não é match, notifica o recebedor para instigar a assinatura VIP
+          // =====================================================
+          const { notifications } = await import("../db/schema.js");
+          await db.insert(notifications).values({
+            userId: toUserId,
+            type: "secret_admirer",
+            title: "❤️ Alguém curtiu você!",
+            body: "Você tem um novo admirador secreto. Torne-se VIP para descobrir quem é e dar match imediatamente!",
+            link: "/plans",
+          });
         }
       }
 

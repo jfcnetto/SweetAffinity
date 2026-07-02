@@ -1,0 +1,39 @@
+# Fase 08 - E-mails, Notificações in-app e Testes E2E (Refinamento)
+
+Nesta fase focaremos em retenção (através de notificações e emails transacionais) e confiabilidade (com os testes End-to-End).
+
+## Escopo das Alterações
+
+### 1. E-mails Transacionais (React Email)
+Vamos integrar o `react-email` para renderizar templates de e-mail limpos e responsivos no backend.
+- **Templates:** Criarei templates para as ações cruciais: `WelcomeEmail` (Boas-vindas), `NewMatchEmail` (Novo Match) e `PaymentSuccessEmail` (Confirmação de VIP).
+- **Envio:** Inicialmente configurarei para enviar através do `nodemailer` (SMTP comum) ou integrador popular (como Resend) - preciso que me confirme se já possui uma conta no Resend, Sendgrid ou AWS SES, caso contrário faremos um mock no console.
+
+### 2. Notificações In-App
+Um sino de notificações na barra superior do aplicativo para avisar sobre novos matches, mensagens e aprovação de fotos.
+- **Banco de Dados:** Nova tabela `notifications` (Drizzle) contendo: `user_id`, `type`, `title`, `body`, `read` (booleano) e data.
+- **Backend API:** Endpoints `GET /notifications` e `PUT /notifications/:id/read`.
+- **Tempo Real (WebSockets):** Disparar evento Socket.io toda vez que uma notificação for criada, para o ícone vibrar/mostrar badge sem precisar atualizar a tela.
+- **Frontend UI:** Um modal Popover ao clicar no sino exibindo o histórico recente.
+
+### 3. Testes End-to-End (E2E) com Playwright
+- **Instalação:** Adição do Playwright no ecossistema (idealmente na raiz do monorepo, pasta `e2e/`).
+- **Casos de Teste:** Automação de um navegador real executando as seguintes ações de ponta-a-ponta:
+  1. Preenchimento de formulário de cadastro.
+  2. Submissão de foto (Verificação).
+  3. Assinatura VIP.
+  4. Envio de mensagem no Chat para um perfil simulado.
+
+## ⚠️ Necessário Revisão do Usuário
+
+> [!IMPORTANT]
+> **Provedor de E-mail:** Qual sistema você pretende usar para despachar os e-mails em produção? (Ex: Resend, Sendgrid, Amazon SES, ou SMTP próprio?). Se não tiver um definido agora, criarei uma camada genérica usando `Nodemailer` que simula o envio imprimindo o e-mail no console.
+
+> [!TIP]
+> **Fluxo E2E:** Para executar o teste E2E do pagamento no Playwright (sem gastar dinheiro real), vamos apontar o sistema para a API de Testes do Stripe. Isso já está de acordo com seu ambiente atual?
+
+## Plano de Verificação
+- Rodar `drizzle-kit push` para criar a tabela de Notificações.
+- Renderizar um e-mail de teste em modo desenvolvimento.
+- Conectar dois perfis simulados para ver o "badge vermelho" do sino brilhar.
+- Executar `npx playwright test` e ver o relatório verde confirmando a robustez do fluxo.

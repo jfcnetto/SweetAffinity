@@ -161,6 +161,31 @@ export const profileRoutes = async (fastify: FastifyInstance) => {
           return reply.status(404).send({ message: "Perfil não encontrado." });
         }
 
+        // =====================================================
+        // FEATURE PREMIUM: Notificar visualização de perfil
+        // =====================================================
+        const viewerId = (request.user as { sub: string }).sub;
+        if (profile.isPremium && viewerId !== profile.id) {
+          // Busca o nome do visitante para a notificação
+          const [viewer] = await db
+            .select({ displayName: profiles.displayName })
+            .from(profiles)
+            .where(eq(profiles.id, viewerId));
+
+          if (viewer) {
+            const { notifications } = await import("../db/schema.js");
+            
+            // Opcional: Impedir spam verificando se já não notificou recentemente
+            await db.insert(notifications).values({
+              userId: profile.id,
+              type: "profile_view",
+              title: "👀 Alguém está de olho em você!",
+              body: `${viewer.displayName} acabou de visitar seu perfil. Dê o primeiro passo e envie uma mensagem!`,
+              link: `/matches`, // O link poderia ir direto pro perfil se o frontend suportasse
+            });
+          }
+        }
+
         return reply.send(profile);
       } catch (error) {
         fastify.log.error(error);

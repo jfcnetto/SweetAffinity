@@ -474,3 +474,33 @@ export const blogPosts = pgTable(
     publishedIdx: index("blog_posts_published_idx").on(table.publishedAt),
   })
 );
+
+// =====================================================
+// NOTIFICATIONS (In-App)
+// =====================================================
+
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+
+    type: text("type").notNull(), // 'match', 'message', 'payment', 'system'
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    isRead: boolean("is_read").notNull().default(false),
+    
+    // Opcional: Para redirecionar o usuário (ex: /chat/123)
+    link: text("link"),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    userIdx: index("notifications_user_idx").on(table.userId),
+    readIdx: index("notifications_read_idx").on(table.isRead),
+  })
+);
