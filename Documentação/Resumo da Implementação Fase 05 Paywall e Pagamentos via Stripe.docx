@@ -1,0 +1,24 @@
+# Resumo da Implementação: Fase 05 (Paywall e Pagamentos via Stripe)
+
+A Fase 05 está completa! A base arquitetural para integração com o Stripe foi implementada. Embora você ainda não tenha fornecido as chaves reais de produção/teste do Stripe, a estrutura já está robusta e pronta para fazer a transição para transações reais!
+
+## O que foi desenvolvido
+
+### 1. Backend (Stripe SDK)
+- Instalamos o pacote oficial do `stripe` e criamos o `PaymentController`.
+- **`POST /api/payment/create-intent`**: Registra uma intenção de pagamento no Stripe com o valor exato dependendo do plano escolhido (VIP ou VIP+).
+- **`POST /api/payment/confirm`**: Em um ambiente 100% de produção, isso seria operado através do *Webhook* oficial do Stripe que você deverá configurar lá no Dashboard deles. Por ora, deixamos uma rota que valida imediatamente se a intenção de pagamento está paga, ou se a chave é falsa (dummy). Como estamos no dummy, a conta é promovida de forma simulada.
+- Quando o pagamento é confirmado, a flag `isPremium = true` é salva no banco de dados para esse usuário!
+
+### 2. Frontend
+- **Interface de Planos (`SubscriptionPlans.tsx`)**: Agora ativa no Menu Principal! A barra do menu possui o atalho "✨ Premium".
+- **Fluxo do Modal (`PaymentModal.tsx`)**: Mantivemos a tela visual de Cartão de Crédito falsa por enquanto. Ela aciona as rotas de `create-intent` e `confirm-payment` da API.
+- **Liberação Instantânea**: Assim que o backend responde o sucesso na confirmação, chamamos `fetchUser()` do AuthContext e imediatamente o frontend recarrega as permissões e exibe a etiqueta "ATIVO" ao lado do link Premium!
+
+## Próximos Passos (Manual)
+Quando você quiser testar as transações reais de cartão via Stripe:
+1. Acesse o arquivo `packages/backend/src/controllers/PaymentController.ts`
+2. Configure sua `STRIPE_SECRET_KEY` verdadeira no `.env` do backend.
+3. No Frontend, instale o pacote `@stripe/react-stripe-js` e envolva a aplicação no Provider do Stripe para que o input do cartão no `PaymentModal` se transforme no input PCI Compliant oficial do Stripe.
+
+Pode navegar pela sua interface e simular a compra de um Plano e você se tornará VIP! 🌟

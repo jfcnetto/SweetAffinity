@@ -1,0 +1,39 @@
+# Plano de Implementação: Fase 05 (Paywall e Pagamentos)
+
+A Fase 05 consiste em permitir que usuários façam upgrade em suas contas para se tornarem "Premium", desbloqueando recursos como o envio de contatos (dependendo da sua aprovação final sobre a regra) e mensagens ilimitadas.
+
+## User Review Required
+> [!IMPORTANT]
+> **Simulação do Gateway de Pagamento:**
+> Para a finalidade deste projeto e por questões de escopo inicial, vamos simular o gateway de pagamento (criando um fluxo Mock local) ou você já possui alguma chave de testes do Stripe / MercadoPago para integrarmos?
+> *Se não tiver, construirei a integração simulada na API para que o fluxo de checkout libere o perfil instantaneamente, deixando a arquitetura pronta para substituição do serviço real futuramente.*
+
+## Mudanças Propostas
+
+### Backend (Node.js / Fastify)
+
+#### [NEW] `packages/backend/src/controllers/PaymentController.ts`
+- Implementar as rotas de pagamento.
+- **`POST /api/payment/checkout`**: Receberá a intenção de compra de um plano. O controller atualizará as tabelas do usuário autenticado, marcando `is_premium = true` na tabela `users`, e inserindo/atualizando o controle de assinaturas.
+
+#### [MODIFY] `packages/backend/src/index.ts`
+- Registrar as rotas do `paymentRoutes`.
+
+### Frontend (React)
+
+#### [NEW] `packages/frontend/src/services/payment.service.ts`
+- Serviço Axios para disparar as requisições de pagamento para o backend.
+
+#### [MODIFY] `packages/frontend/src/components/PaymentModal.tsx`
+- Substituir o timeout "falso" (Mock) do React por uma chamada real à API (`PaymentService.checkout`).
+- Quando a API retornar sucesso, disparar a atualização do contexto do usuário (`AuthContext.fetchUser`) para que o frontend imediatamente entenda que o usuário agora é VIP (mudando a flag `isPremium`).
+
+#### [MODIFY] `packages/frontend/src/App.tsx`
+- Integrar os componentes visuais já existentes `SubscriptionPlans.tsx` e `PaymentModal.tsx`.
+- Adicionar uma aba/botão "✨ Premium" na barra superior para os usuários poderem acessar a página de planos e realizar a compra!
+
+## Verification Plan
+1. Faremos login com uma conta gratuita.
+2. Acessaremos a aba "✨ Premium".
+3. Clicaremos em assinar o Plano Principal e preencheremos os dados do cartão de crédito (simulados).
+4. O frontend processará o pagamento, consultará a API backend, e o contexto exibirá uma mensagem de sucesso, liberando os privilégios VIP imediatamente em tempo real.

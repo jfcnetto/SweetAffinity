@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import type { Plan } from '../types';
+import { PaymentService } from '../services/payment.service.js';
+import toast from 'react-hot-toast';
+import { useAuth } from '../contexts/AuthContext.js';
 
 interface PaymentModalProps {
     plan: Plan;
@@ -13,18 +16,25 @@ const Spinner: React.FC<{ size?: string }> = ({ size = 'h-5 w-5' }) => (
 
 const CheckCircleIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
 
-
 const PaymentModal: React.FC<PaymentModalProps> = ({ plan, onClose, onPaymentSuccess }) => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
+    const { fetchUser } = useAuth();
 
-    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setIsProcessing(true);
-        setTimeout(() => {
-            setIsProcessing(false);
-            setIsSuccess(true);
-        }, 2000);
+        try {
+           const intent = await PaymentService.createIntent(plan.name.toLowerCase() === 'vip' ? 'premium' : 'premium_plus');
+           await PaymentService.confirmPayment(intent.paymentIntentId);
+           
+           await fetchUser();
+           setIsSuccess(true);
+        } catch (error: any) {
+           toast.error(error.response?.data?.message || 'Erro ao processar pagamento.');
+        } finally {
+           setIsProcessing(false);
+        }
     };
 
     if (isSuccess) {

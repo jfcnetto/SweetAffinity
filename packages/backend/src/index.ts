@@ -26,6 +26,7 @@ import {
 } from "./controllers/MessageController.js";
 import { adminRoutes } from "./controllers/AdminController.js";
 import { matchRoutes } from "./controllers/MatchController.js";
+import { paymentRoutes } from "./controllers/PaymentController.js";
 
 // =====================================================
 // FASTIFY
@@ -138,6 +139,10 @@ async function start() {
     });
 
     await server.register(matchRoutes);
+
+    await server.register(paymentRoutes, {
+      prefix: "/payment",
+    });
 
     // =====================================================
     // START SERVER

@@ -9,13 +9,23 @@ import { useAuth } from './contexts/AuthContext.js';
 
 import FeedPage from './components/FeedPage.js';
 import MatchesPage from './components/MatchesPage.js';
+import SubscriptionPlans from './components/SubscriptionPlans.js';
+import PaymentModal from './components/PaymentModal.js';
+import type { Plan } from './types.js';
+
+const mockPlans: Plan[] = [
+  { name: 'Gratuito', price: 'R$ 0,00', features: ['Criar perfil básico', 'Ver 10 perfis por dia', '1 Match por dia'], highlight: false },
+  { name: 'VIP', price: 'R$ 99,00/mês', features: ['Perfis ilimitados', 'Chat e Match ilimitados', 'Sem anúncios', 'Selo VIP'], highlight: true },
+  { name: 'VIP+', price: 'R$ 149,00/mês', features: ['Tudo do VIP', 'Ver quem curtiu você', 'Destaque nas buscas'], highlight: false }
+];
 
 export default function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [currentView, setCurrentView] = useState<'home' | 'feed' | 'matches'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'feed' | 'matches' | 'plans'>('home');
+  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, logout, user } = useAuth();
 
   // Se estiver logado e na home, joga pro feed
   React.useEffect(() => {
@@ -29,6 +39,14 @@ export default function App() {
   const openAuthModal = (mode: 'login' | 'register') => {
     setAuthMode(mode);
     setIsAuthModalOpen(true);
+  };
+
+  const handleSubscribeClick = (plan: Plan) => {
+    if (!isAuthenticated) {
+      openAuthModal('login');
+      return;
+    }
+    setSelectedPlan(plan);
   };
 
   return (
@@ -57,6 +75,12 @@ export default function App() {
            >
              💕 Matches
            </button>
+           <button 
+             onClick={() => setCurrentView('plans')} 
+             className={`font-semibold flex items-center gap-1 ${currentView === 'plans' ? 'text-gradient-pink border-b-2 border-gradient-pink pb-1' : 'text-gray-500 hover:text-gray-700'}`}
+           >
+             ✨ Premium {user?.isPremium && <span className="bg-amber-400 text-white text-xs px-2 py-0.5 rounded-full ml-1">ATIVO</span>}
+           </button>
         </div>
       )}
 
@@ -71,6 +95,7 @@ export default function App() {
         
         {currentView === 'feed' && <FeedPage />}
         {currentView === 'matches' && <MatchesPage />}
+        {currentView === 'plans' && <SubscriptionPlans plans={mockPlans} onSubscribeClick={handleSubscribeClick} />}
       </main>
 
       <Footer />
@@ -82,6 +107,17 @@ export default function App() {
           onRegistrationComplete={() => setIsAuthModalOpen(false)}
           onLoginSuccess={() => setIsAuthModalOpen(false)}
           navigateTo={(page) => console.log('Navigate to:', page)}
+        />
+      )}
+
+      {selectedPlan && (
+        <PaymentModal
+          plan={selectedPlan}
+          onClose={() => setSelectedPlan(null)}
+          onPaymentSuccess={() => {
+            setSelectedPlan(null);
+            setCurrentView('feed');
+          }}
         />
       )}
     </div>
