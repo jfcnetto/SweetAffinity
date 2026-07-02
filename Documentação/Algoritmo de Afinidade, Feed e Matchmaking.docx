@@ -1,0 +1,81 @@
+# Fase 03 — Algoritmo de Afinidade, Feed e Matchmaking
+
+O objetivo da Fase 03 é implementar o coração da plataforma Sweet Affinity: o motor de busca, o feed de perfis (estilo "Swipe") e o sistema de Likes/Matches mútuos.
+
+## User Review Required
+
+> [!IMPORTANT]
+> Aprovação do Plano
+> Por favor, revise a especificação abaixo. Confirme se as regras do algoritmo de afinidade (como ordenação e filtros padrão) atendem aos requisitos de negócios para Sugar Dating antes de começarmos a codificação.
+
+## Open Questions
+
+> [!WARNING]
+> Questões em Aberto
+> 1. Para o Feed, devemos ocultar perfis que o usuário já deu "Like" ou "Pass"? (O padrão é ocultar para não repetir perfis no swipe).
+> 2. Perfis "Daddy" só devem ver "Babies", e vice-versa, correto? A restrição será estrita no backend baseada no campo `seeking` do perfil.
+
+## Proposed Changes
+
+---
+
+### Banco de Dados (Drizzle ORM)
+
+#### [MODIFY] packages/backend/src/db/schema.ts
+- Criar a tabela `swipes`:
+  - `id`: UUID Primary Key
+  - `from_user_id`: UUID (FK users)
+  - `to_user_id`: UUID (FK users)
+  - `action`: ENUM ('like', 'pass')
+  - `created_at`: Timestamp
+- Criar a tabela `matches`:
+  - `id`: UUID Primary Key
+  - `user_a_id`: UUID (FK users) - Sempre o UUID menor para evitar duplicidade
+  - `user_b_id`: UUID (FK users)
+  - `created_at`: Timestamp
+
+---
+
+### Backend (Fastify API)
+
+#### [NEW] packages/backend/src/controllers/MatchController.ts
+- `GET /api/feed`: Retorna uma lista de perfis recomendados.
+  - Filtra perfis baseados no `seeking_type` e `profile_type` do usuário.
+  - Exclui perfis que o usuário já deu swipe (Like/Pass).
+  - Ordena por `popularity_score` (alta para baixa).
+- `POST /api/swipe`: Registra um 'like' ou 'pass'.
+  - Se for 'like', verifica se o alvo já deu 'like' no usuário atual.
+  - Se sim, cria um registro na tabela `matches` e retorna `{ match: true }`.
+  - Se não, apenas salva o swipe e retorna `{ match: false }`.
+- `GET /api/matches`: Retorna todos os matches do usuário logado (para a aba de Chat).
+
+#### [MODIFY] packages/backend/src/index.ts
+- Registrar as rotas do `MatchController`.
+
+---
+
+### Frontend (React / Vite)
+
+#### [NEW] packages/frontend/src/services/match.service.ts
+- Funções para consumir os novos endpoints: `getFeed()`, `swipe(targetId, action)`, `getMatches()`.
+
+#### [MODIFY] packages/frontend/src/pages/FeedPage.tsx
+- Integrar a página de Feed (Tinder-like UI) com a API real.
+- Buscar lista de perfis do `/api/feed`.
+- Ao clicar em curtir/recusar, chamar `/api/swipe`.
+- Se a API retornar `{ match: true }`, exibir a tela de "It's a Match!" (MatchModal).
+
+#### [MODIFY] packages/frontend/src/pages/MatchesPage.tsx
+- Integrar a listagem de conversas com os dados do endpoint `/api/matches`.
+
+## Verification Plan
+
+### Automated Tests
+- Testes unitários para a lógica de cruzamento de `seeking_type`.
+- Testes de integração na rota de Swipe para garantir que um Match mútuo cria o registro na tabela `matches`.
+
+### Manual Verification
+- Fazer login com um perfil Daddy e dar "Like" num perfil Baby.
+- Fazer login com o perfil Baby, verificar se o Daddy aparece no Feed.
+- Dar "Like" no Daddy e ver o Match acontecer em tempo real na UI.
+- Garantir que o Daddy não aparece mais no Feed após o Swipe.

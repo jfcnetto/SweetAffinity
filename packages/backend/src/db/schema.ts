@@ -86,6 +86,11 @@ export const subscriptionStatusEnum = pgEnum("subscription_status", [
   "cancelled",
 ]);
 
+export const swipeActionEnum = pgEnum("swipe_action", [
+  "like",
+  "pass",
+]);
+
 // =====================================================
 // USERS
 // =====================================================
@@ -303,11 +308,11 @@ export const matches = pgTable(
 );
 
 // =====================================================
-// LIKES
+// SWIPES (Substitui LIKES)
 // =====================================================
 
-export const likes = pgTable(
-  "likes",
+export const swipes = pgTable(
+  "swipes",
   {
     id: uuid("id").defaultRandom().primaryKey(),
 
@@ -319,12 +324,14 @@ export const likes = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
 
+    action: swipeActionEnum("action").notNull(),
+
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
   },
   (table) => ({
-    uniqueLike: uniqueIndex("unique_like_idx").on(
+    uniqueSwipe: uniqueIndex("unique_swipe_idx").on(
       table.fromUserId,
       table.toUserId
     ),

@@ -1,0 +1,30 @@
+# Resumo da Implementação: Fase 03 (Matchmaking, Feed e Swipes)
+
+A Fase 03 foi implementada com sucesso no backend e frontend. Adicionalmente, detectamos um erro de configuração na compilação do Frontend que estava impedindo a inicialização (uso incorreto do script TSX do backend) e recriamos a raiz do App.tsx e configuramos corretamente o Vite para reativar o frontend!
+
+## Mudanças Realizadas
+
+### 1. Banco de Dados & Drizzle ORM
+- Substituímos a antiga tabela simples de `likes` pela tabela de `swipes`, contendo a coluna `action` (`ENUM: like | pass`).
+- Confirmamos que a tabela de `matches` continua configurada com chaves únicas que combinam a união dos dois usuários.
+- Realizamos a geração e registro das migrations no Drizzle-kit.
+
+### 2. Backend (Fastify)
+- **`MatchController.ts`**:
+  - `GET /api/feed`: Retorna até 20 perfis baseados nas restrições Sugar. Se o usuário for *Baby*, a API só retornará *Daddies* ou *Mommies* ativos, e vice-versa. Adicionalmente excluímos do feed os usuários que já foram curtidos/recusados no passado.
+  - `POST /api/swipe`: Registra a intenção de Like ou Pass de forma idempotente usando `.onConflictDoNothing()`. Se ocorrer um cruzamento mútuo (Like de ambas as partes), inserimos a conexão na tabela `matches`. Retorna `match: true` para o UI caso resulte em um match.
+  - `GET /api/matches`: Busca o perfil dos usuários que efetivamente cruzaram Matches.
+- **`index.ts`**: Registrado as rotas em `matchRoutes` (com prefixo automático da base para se beneficiar da segurança do Fastify JWT).
+
+### 3. Frontend (React + Vite)
+- **Correção Geral**: O frontend não estava mais buildando. Atualizei `package.json`, adicionei os plugins do Vite, e reescrevi o `index.tsx` e `App.tsx` para voltar a renderizar!
+- **`match.service.ts`**: Axios module criado para realizar as 3 requisições da API.
+- **`FeedPage.tsx`**: Interface "estilo Tinder". Exibe o perfil com as fotos, bio e localização, oferecendo botões imensos para Dar Like (❤️) ou Pass (❌). Usa animações de toast para avisar quando um Match é conquistado no momento do clique.
+- **`MatchesPage.tsx`**: Listagem das conexões. Renderiza avatares, o nome dos Daddies/Babies e o botão de "Enviar Mensagem" (que será integrado na Fase de Chat).
+- **Abas do Sistema**: Se o usuário logar, ele imediatamente visualizará os novos menus de "🔥 Feed" e "💕 Matches" ao lado do Header principal.
+
+## Como Validar
+1. Acesse o Frontend e faça o Login (você será automaticamente redirecionado para a view logada).
+2. Clique na aba **🔥 Feed**.
+3. Rejeite e Curta os perfis! Tente usar duas abas/browsers com duas contas diferentes com relacionamento `baby` e `daddy` e dê match entre si!
+4. Acesse a aba **💕 Matches** para ver o Match populado após a conexão dupla!
