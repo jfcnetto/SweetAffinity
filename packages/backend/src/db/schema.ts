@@ -441,3 +441,36 @@ export const auditLogs = pgTable(
     entityIdx: index("audit_logs_entity_idx").on(table.entity, table.entityId),
   })
 );
+
+// =====================================================
+// BLOG POSTS (Growth / SEO)
+// =====================================================
+
+export const blogPosts = pgTable(
+  "blog_posts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    title: text("title").notNull(),
+    slug: text("slug").notNull(),
+    content: text("content").notNull(),
+    metaDescription: text("meta_description").notNull(),
+    authorId: uuid("author_id").references(() => users.id, { onDelete: "set null" }),
+
+    publishedAt: timestamp("published_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => ({
+    slugIdx: uniqueIndex("blog_posts_slug_idx").on(table.slug),
+    publishedIdx: index("blog_posts_published_idx").on(table.publishedAt),
+  })
+);

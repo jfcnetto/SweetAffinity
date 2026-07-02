@@ -158,6 +158,14 @@ async function start() {
     server.log.info(`🚀 Backend iniciado na porta ${port}`);
 
     // =====================================================
+    // BLOG AI GENERATOR CRON
+    // =====================================================
+    const { runDailyBlogCron } = await import("./jobs/blogGenerator.js");
+    setInterval(() => {
+      runDailyBlogCron().catch(err => server.log.error(err));
+    }, 24 * 60 * 60 * 1000); // Roda a cada 24 horas
+
+    // =====================================================
     // SOCKET.IO (iniciado após o servidor estar ouvindo)
     // =====================================================
 

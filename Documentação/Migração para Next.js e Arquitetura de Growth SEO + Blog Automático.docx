@@ -1,0 +1,37 @@
+# Fase 07 - Migração para Next.js e Arquitetura de Growth (SEO + Blog Automático)
+
+Esta fase consiste na migração da nossa aplicação (atualmente uma Single Page Application em React + Vite) para **Next.js**. Isso permitirá renderização do lado do servidor (SSR) e geração de sites estáticos (SSG), vitais para SEO e aquisição de tráfego orgânico.
+
+## Estratégia de Migração Escolhida
+**Substituir o frontend atual:** O diretório `packages/frontend` será limpo do Vite e reconstruído em Next.js mantendo o código e componentes.
+
+## Alterações Propostas
+
+### 1. Inicialização e Estrutura do Next.js
+- Limpar arquivos específicos do Vite e reconfigurar o `package.json` de `packages/frontend` para Next.js (App Router).
+- Mover a configuração do Tailwind e os estilos globais.
+- Transformar as renderizações condicionais do `App.tsx` na arquitetura de diretórios do Next.js:
+  - `app/page.tsx` (Home)
+  - `app/feed/page.tsx` (Feed protegido)
+  - `app/admin/page.tsx` (Backoffice protegido)
+
+### 2. Otimização de SEO (Growth)
+- Adicionar o objeto `metadata` nativo do Next.js para Titles, Meta Descriptions e OpenGraph dinâmicos na Home e páginas de planos.
+- Configurar rotas geradoras automáticas para `sitemap.xml` e `robots.txt`.
+
+### 3. Arquitetura do Blog (Conteúdo e Inbound Marketing)
+- Criar a rota `app/blog/page.tsx` para listar todos os artigos.
+- Criar a rota dinâmica `app/blog/[slug]/page.tsx` para exibir a página focada em SEO (Server-Side Rendered) de um artigo específico.
+- **Banco de dados:** Criar tabela `blog_posts` no Drizzle (id, title, slug, content, meta_description, published_at) no backend para armazenar os artigos.
+
+### 4. Sistema de Auto-alimentação do Blog (IA)
+- Desenvolver um script / cron job no Backend Fastify (`/src/jobs/blogGenerator.ts`).
+- **Lógica:** Uma vez por dia (via cron), o servidor consultará a API da Gemini (ou gerará um texto simulado inicialmente) criando um artigo único com dicas de relacionamento/lifestyle ("Sugar" ou genérico) com foco em palavras-chave SEO, e salvará no banco.
+- Esse conteúdo irá alimentar automaticamente o tráfego do domínio.
+
+## Plano de Verificação
+
+### Testes Manuais
+- Iniciar o servidor Next.js na porta usual e garantir que o CSS e as rotas antigas ainda funcionam como Client/Server Components.
+- Validar `curl http://localhost:5173/` e verificar se a resposta bruta HTML contém as tags `<title>` e `<meta name="description">` inseridas por SSR, e não apenas uma div vazia.
+- Invocar manualmente a rotina de auto-geração do Blog para assegurar que um novo artigo é criado e imediatamente visualizado na rota `/blog`.

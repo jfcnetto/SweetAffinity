@@ -1,5 +1,6 @@
 
 import React from 'react';
+import Image from 'next/image';
 
 interface HeroProps {
   onSignUpClick: () => void;
@@ -9,7 +10,13 @@ const Hero: React.FC<HeroProps> = ({ onSignUpClick }) => {
   return (
     <section className="relative bg-gray-900 text-white h-[70vh] flex items-center justify-center text-center">
       <div className="absolute inset-0">
-        <img src="https://picsum.photos/seed/hero/1920/1080" alt="Casal elegante" className="w-full h-full object-cover opacity-30" />
+        <Image 
+          src="https://picsum.photos/seed/hero/1920/1080" 
+          alt="Casal elegante" 
+          fill
+          className="object-cover opacity-30" 
+          priority
+        />
       </div>
       <div className="relative z-10 p-6">
         <h1 className="text-5xl md:text-7xl font-bold font-display leading-tight mb-4">
