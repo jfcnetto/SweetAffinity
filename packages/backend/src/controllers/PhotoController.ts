@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import multipart from "@fastify/multipart";
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { randomUUID } from "crypto";
+import sharp from "sharp";
 
 import { db } from "../db/index.js";
 import { photos } from "../db/schema.js";
@@ -33,7 +33,7 @@ const MINIO_URL =
 // =====================================================
 
 export const photoRoutes = async (fastify: FastifyInstance) => {
-  await fastify.register(multipart);
+  // multipart já registrado globalmente em index.ts (10MB limit — RN-015)
 
   // =====================================================
   // UPLOAD PHOTO
@@ -45,7 +45,7 @@ export const photoRoutes = async (fastify: FastifyInstance) => {
       try {
         await request.jwtVerify();
 
-        const user = request.user as { id: string };
+        const user = request.user as { sub: string };
 
         const file = await request.file();
 
@@ -58,6 +58,14 @@ export const photoRoutes = async (fastify: FastifyInstance) => {
         // =====================================================
         // VALIDATION
         // =====================================================
+
+        // RN-012: Verificar cota máxima de 10 fotos
+        const userPhotos = await db.select().from(photos).where(eq(photos.userId, user.sub));
+        if (userPhotos.length >= 10) {
+          return reply.status(422).send({
+            message: "Limite máximo de 10 fotos atingido.",
+          });
+        }
 
         const allowedMimeTypes = [
           "image/jpeg",
@@ -75,20 +83,36 @@ export const photoRoutes = async (fastify: FastifyInstance) => {
 
         const fileExtension = file.filename.split(".").pop();
 
-        const fileName = `${randomUUID()}.${fileExtension}`;
-
-        const storagePath = `users/${user.id}/${fileName}`;
+        const fileName = `${randomUUID()}`;
+        const originalPath = `users/${user.sub}/photos/${fileName}-original.${fileExtension}`;
+        const thumbPath = `users/${user.sub}/photos/${fileName}-thumb.jpg`;
 
         // =====================================================
         // UPLOAD TO MINIO / S3
         // =====================================================
 
+        // RN-016: Upload original
         await s3Client.send(
           new PutObjectCommand({
             Bucket: BUCKET_NAME,
-            Key: storagePath,
+            Key: originalPath,
             Body: fileBuffer,
             ContentType: file.mimetype,
+          })
+        );
+
+        // RN-016: Gerar e subir thumbnail
+        const thumbBuffer = await sharp(fileBuffer)
+          .resize(400, 400, { fit: "cover" })
+          .jpeg({ quality: 85 })
+          .toBuffer();
+
+        await s3Client.send(
+          new PutObjectCommand({
+            Bucket: BUCKET_NAME,
+            Key: thumbPath,
+            Body: thumbBuffer,
+            ContentType: "image/jpeg",
           })
         );
 
@@ -99,10 +123,10 @@ export const photoRoutes = async (fastify: FastifyInstance) => {
         const [photo] = await db
           .insert(photos)
           .values({
-            userId: user.id,
-            storagePath,
+            userId: user.sub,
+            storagePath: originalPath, // O path do banco reflete o original. Em consultas, retornamos o thumb.
             isPrimary: false,
-            isApproved: false,
+            status: "pending",  // RN-018: moderação inicial
           })
           .returning();
 
@@ -110,7 +134,7 @@ export const photoRoutes = async (fastify: FastifyInstance) => {
           message: "Foto enviada com sucesso.",
           photo: {
             ...photo,
-            url: `${MINIO_URL}/${storagePath}`,
+            url: `${MINIO_URL}/${thumbPath}`, // Retorna o thumbnail por padrão
           },
         });
       } catch (error) {
@@ -133,18 +157,21 @@ export const photoRoutes = async (fastify: FastifyInstance) => {
       try {
         await request.jwtVerify();
 
-        const user = request.user as { id: string };
+        const user = request.user as { sub: string };
 
         const userPhotos = await db
           .select()
           .from(photos)
-          .where(eq(photos.userId, user.id));
+          .where(eq(photos.userId, user.sub));
 
         return reply.send(
-          userPhotos.map((p) => ({
-            ...p,
-            url: `${MINIO_URL}/${p.storagePath}`,
-          }))
+          userPhotos.map((p) => {
+            const thumbPath = p.storagePath.replace(/-original\.[a-zA-Z0-9]+$/, "-thumb.jpg");
+            return {
+              ...p,
+              url: `${MINIO_URL}/${thumbPath}`,
+            };
+          })
         );
       } catch (error) {
         fastify.log.error(error);
@@ -166,7 +193,7 @@ export const photoRoutes = async (fastify: FastifyInstance) => {
       try {
         await request.jwtVerify();
         const { userId } = request.params as { userId: string };
-        const viewer = request.user as { id: string; isPremium?: boolean };
+        const viewer = request.user as { sub: string; isPremium?: boolean };
 
         const userPhotos = await db
           .select()
@@ -180,14 +207,98 @@ export const photoRoutes = async (fastify: FastifyInstance) => {
         });
 
         return reply.send(
-          visiblePhotos.map((p) => ({
-            ...p,
-            url: `${MINIO_URL}/${p.storagePath}`,
-          }))
+          visiblePhotos.map((p) => {
+            const thumbPath = p.storagePath.replace(/-original\.[a-zA-Z0-9]+$/, "-thumb.jpg");
+            return {
+              ...p,
+              url: `${MINIO_URL}/${thumbPath}`,
+            };
+          })
         );
       } catch (error) {
         fastify.log.error(error);
         return reply.status(500).send({ message: "Erro ao buscar fotos do usuário." });
+      }
+    }
+  );
+
+  // =====================================================
+  // SET PHOTO AS PRIMARY (RN-013)
+  // =====================================================
+
+  fastify.put(
+    "/:id/primary",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        await request.jwtVerify();
+        const user = request.user as { sub: string };
+        const { id } = request.params as { id: string };
+
+        // Verifica se a foto existe e pertence ao user
+        const [photo] = await db
+          .select()
+          .from(photos)
+          .where(and(eq(photos.id, id), eq(photos.userId, user.sub)));
+
+        if (!photo) {
+          return reply.status(404).send({ message: "Foto não encontrada." });
+        }
+
+        // Remove a flag primary das outras
+        await db
+          .update(photos)
+          .set({ isPrimary: false })
+          .where(eq(photos.userId, user.sub));
+
+        // Define a nova como primary
+        await db
+          .update(photos)
+          .set({ isPrimary: true })
+          .where(eq(photos.id, id));
+
+        return reply.send({ message: "Foto definida como principal." });
+      } catch (error) {
+        fastify.log.error(error);
+        return reply.status(500).send({ message: "Erro ao definir foto principal." });
+      }
+    }
+  );
+
+  // =====================================================
+  // TOGGLE PHOTO PRIVACY (RN-018)
+  // =====================================================
+
+  fastify.put(
+    "/:id/privacy",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        await request.jwtVerify();
+        const user = request.user as { sub: string };
+        const { id } = request.params as { id: string };
+        const { isPrivate } = request.body as { isPrivate: boolean };
+
+        const [photo] = await db
+          .select()
+          .from(photos)
+          .where(and(eq(photos.id, id), eq(photos.userId, user.sub)));
+
+        if (!photo) {
+          return reply.status(404).send({ message: "Foto não encontrada." });
+        }
+
+        const [updatedPhoto] = await db
+          .update(photos)
+          .set({ isPrivate })
+          .where(eq(photos.id, id))
+          .returning();
+
+        return reply.send({
+          message: "Privacidade da foto atualizada.",
+          photo: updatedPhoto,
+        });
+      } catch (error) {
+        fastify.log.error(error);
+        return reply.status(500).send({ message: "Erro ao alterar privacidade." });
       }
     }
   );
@@ -202,7 +313,7 @@ export const photoRoutes = async (fastify: FastifyInstance) => {
       try {
         await request.jwtVerify();
 
-        const user = request.user as { id: string };
+        const user = request.user as { sub: string };
 
         const { id } = request.params as { id: string };
 
@@ -210,7 +321,7 @@ export const photoRoutes = async (fastify: FastifyInstance) => {
         const [photo] = await db
           .select()
           .from(photos)
-          .where(and(eq(photos.id, id), eq(photos.userId, user.id)));
+          .where(and(eq(photos.id, id), eq(photos.userId, user.sub)));
 
         if (!photo) {
           return reply.status(404).send({
@@ -218,16 +329,37 @@ export const photoRoutes = async (fastify: FastifyInstance) => {
           });
         }
 
-        // Remove do MinIO
-        await s3Client.send(
-          new DeleteObjectCommand({
-            Bucket: BUCKET_NAME,
-            Key: photo.storagePath,
-          })
-        );
+        // Remove do MinIO (original e thumbnail RN-017)
+        const thumbPath = photo.storagePath.replace(/-original\.[a-zA-Z0-9]+$/, "-thumb.jpg");
+        
+        await Promise.all([
+          s3Client.send(
+            new DeleteObjectCommand({
+              Bucket: BUCKET_NAME,
+              Key: photo.storagePath,
+            })
+          ),
+          s3Client.send(
+            new DeleteObjectCommand({
+              Bucket: BUCKET_NAME,
+              Key: thumbPath,
+            })
+          )
+        ]);
 
         // Remove do Banco
-        const deleted = await db
-          .delete(photos)
-          .where(eq(photos.id, id))
-          .returning();
+        await db.delete(photos).where(eq(photos.id, id));
+
+        return reply.status(200).send({
+          message: "Foto removida com sucesso.",
+        });
+      } catch (error) {
+        fastify.log.error(error);
+
+        return reply.status(500).send({
+          message: "Erro ao excluir foto.",
+        });
+      }
+    }
+  );
+};

@@ -12,7 +12,7 @@ export const createProfileSchema = z.object({
   }, "Usuário deve ter 18 anos ou mais."),
   
   gender: z.string().max(30).optional(),
-  profileType: z.enum(["baby", "daddy", "mommy"]), // RN-003
+  relationshipType: z.enum(["baby", "daddy", "mommy"]), // RN-003
   
   state: z.string().length(2), // UF
   city: z.string().max(100),
@@ -35,7 +35,7 @@ export const createProfileSchema = z.object({
   maritalStatus: z.enum(["single", "married", "divorced", "widowed"]).optional(),
   seekingDescription: z.string().max(500).optional(),
 }).refine((data) => {
-  if ((data.profileType === "daddy" || data.profileType === "mommy") && !data.incomeRange) {
+  if ((data.relationshipType === "daddy" || data.relationshipType === "mommy") && !data.incomeRange) {
     return false; // RN-004: Obrigatório para Daddy/Mommy
   }
   return true;

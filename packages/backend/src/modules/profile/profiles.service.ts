@@ -1,34 +1,69 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import { db } from "../db/index.js";
-import { profiles } from "../db/schema.js";
-import { eq, ne, and, ilike } from "drizzle-orm";
+import { db } from "../../db/index.js";
+import { profiles } from "../../db/schema.js";
+import { eq } from "drizzle-orm";
 import axios from "axios";
-import { redis } from "../plugins/redis.js";
+import { redis } from "../../plugins/redis.js";
 
 // =====================================================
-// PROFILE SERVICE & LOGIC
+// PROFILE SERVICE — Camada de negócio centralizada
+// Usada pelo ProfileController para lógica de upsert e IBGE
 // =====================================================
 
 export const ProfileService = {
   async upsertProfile(userId: string, data: any) {
     const [existing] = await db.select().from(profiles).where(eq(profiles.id, userId));
-    
-    if (existing) {
-      const { profileType, ...updateData } = data;
-      return await db.update(profiles).set(updateData).where(eq(profiles.id, userId)).returning();
+
+    // RN-011: Validação IBGE antes de persistir
+    if (data.state && data.city) {
+      const cities = await ProfileService.getCities(data.state);
+      // Fallback permissivo se IBGE estiver indisponível (retorna vazio)
+      if (cities.length > 0) {
+        const isValidCity = cities.some((c: any) => c.nome.toLowerCase() === data.city.toLowerCase());
+        if (!isValidCity) {
+          throw new Error("Cidade inválida para o estado informado (IBGE).");
+        }
+      }
     }
-    
-    return await db.insert(profiles).values({ id: userId, ...data }).returning();
+
+    if (existing) {
+      // RN-003: relationshipType é imutável — remove do update
+      const { relationshipType, id, createdAt, popularityScore, profileViews, deletedAt, ...updateData } = data;
+      const [updated] = await db
+        .update(profiles)
+        .set({ ...updateData, updatedAt: new Date() })
+        .where(eq(profiles.id, userId))
+        .returning();
+      return [updated];
+    }
+
+    // Criação: displayName e birthDate são obrigatórios (spec 3.1.3)
+    if (!data.displayName) {
+      throw new Error("displayName é obrigatório.");
+    }
+    if (!data.birthDate) {
+      throw new Error("birthDate é obrigatório.");
+    }
+
+    const [created] = await db
+      .insert(profiles)
+      .values({ id: userId, ...data })
+      .returning();
+    return [created];
   },
 
   async getStates() {
     const cached = await redis.get("ibge:states");
     if (cached) return JSON.parse(cached);
     try {
-      const { data } = await axios.get("https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome");
+      const { data } = await axios.get(
+        "https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome",
+        { timeout: 5000 }
+      );
       await redis.set("ibge:states", JSON.stringify(data), "EX", 86400);
       return data;
-    } catch { return []; }
+    } catch {
+      return [];
+    }
   },
 
   async getCities(uf: string) {
@@ -36,55 +71,14 @@ export const ProfileService = {
     const cached = await redis.get(cacheKey);
     if (cached) return JSON.parse(cached);
     try {
-      const { data } = await axios.get(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${uf.toUpperCase()}/municipios`);
+      const { data } = await axios.get(
+        `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${uf.toUpperCase()}/municipios`,
+        { timeout: 5000 }
+      );
       await redis.set(cacheKey, JSON.stringify(data), "EX", 43200);
       return data;
-    } catch { return []; }
-  }
-};
-
-// =====================================================
-// PROFILE ROUTES
-// =====================================================
-
-export const profileRoutes = async (fastify: FastifyInstance) => {
-  fastify.get("/", async (request: FastifyRequest, reply: FastifyReply) => {
-    try {
-      await request.jwtVerify();
-      const user = request.user as { id: string; profileType: "user" | "admin"; relationshipType?: "baby" | "sugar_daddy" | "sugar_mommy"; };
-      const { page = "1", limit = "20" } = request.query as any;
-
-      let targetTypes: string[] = user.relationshipType === "baby" ? ["sugar_daddy", "sugar_mommy"] : ["baby"];
-
-      const result = await db.select().from(profiles).where(ne(profiles.id, user.id))
-        .limit(parseInt(limit)).offset((parseInt(page) - 1) * parseInt(limit));
-
-      const filtered = result.filter((profile) => targetTypes.includes(profile.relationshipType as any));
-      return reply.send(filtered);
-    } catch (error) {
-      fastify.log.error(error);
-      return reply.status(500).send({ message: "Erro ao buscar perfis." });
+    } catch {
+      return [];
     }
-  });
-
-  fastify.post("/", { preHandler: [fastify.authenticate] }, async (request: FastifyRequest, reply: FastifyReply) => {
-    try {
-      // @ts-ignore
-      const userId = request.user.id;
-      const profile = await ProfileService.upsertProfile(userId, request.body);
-      return reply.status(201).send(profile);
-    } catch (error: any) {
-      fastify.log.error(error);
-      return reply.status(422).send({ message: error.message });
-    }
-  });
-
-  fastify.get("/ibge/states", async (request, reply) => {
-    return await ProfileService.getStates();
-  });
-
-  fastify.get("/ibge/states/:uf/cities", async (request, reply) => {
-    const { uf } = request.params as { uf: string };
-    return await ProfileService.getCities(uf);
-  });
-};
+  },
+};

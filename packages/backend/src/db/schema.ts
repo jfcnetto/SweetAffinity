@@ -15,7 +15,7 @@ import {
 // ENUMS
 // =====================================================
 
-export const userRoleEnum = pgEnum("user_role", [
+export const profileTypeEnum = pgEnum("profile_type", [
   "user",
   "admin",
   "moderator",
@@ -35,9 +35,8 @@ export const genderEnum = pgEnum("gender", [
   "other",
 ]);
 
-// ✅ CORRIGIDO: profileType em users conforme Boas Práticas
-// ("profileType → segurança do sistema — não deve ser regra de negócio do perfil")
-export const profileTypeEnum = pgEnum("profile_type", [
+// ✅ CORRIGIDO: relationshipType em profiles (Regra de Negócio)
+export const relationshipTypeEnum = pgEnum("relationship_type", [
   "baby",
   "daddy",
   "mommy",
@@ -99,13 +98,9 @@ export const users = pgTable(
     email: text("email").notNull(),
     passwordHash: text("password_hash").notNull(),
 
-    role: userRoleEnum("role").notNull().default("user"),
+    // ✅ CORRIGIDO: profileType → segurança do sistema (user/admin)
+    profileType: profileTypeEnum("profile_type").notNull().default("user"),
     status: userStatusEnum("status").notNull().default("pending"),
-
-    // ✅ CORRIGIDO: profileType movido de profiles → users
-    // Boas Práticas: "profileType → segurança do sistema"
-    // Define o tipo do usuário no momento do cadastro (imutável via RN-003)
-    profileType: profileTypeEnum("profile_type"),
 
     isVerified: boolean("is_verified").notNull().default(false),
     isPremium: boolean("is_premium").notNull().default(false),
@@ -113,6 +108,8 @@ export const users = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
+
+    lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
 
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
@@ -146,7 +143,8 @@ export const profiles = pgTable(
 
     gender: genderEnum("gender"),
 
-    // ✅ REMOVIDO: profileType saiu daqui → foi para users (Boas Práticas)
+    // ✅ CORRIGIDO: relationshipType é a regra de negócio (matching)
+    relationshipType: relationshipTypeEnum("relationship_type").notNull(),
 
     state: text("state"),
     city: text("city"),
@@ -188,6 +186,7 @@ export const profiles = pgTable(
     cityIdx: index("profiles_city_idx").on(table.city),
     stateIdx: index("profiles_state_idx").on(table.state),
     genderIdx: index("profiles_gender_idx").on(table.gender),
+    relationshipTypeIdx: index("profiles_relationship_type_idx").on(table.relationshipType),
     // ✅ ADICIONADO: índice para ordenação de listagem (spec 3.1.4 sort params)
     popularityIdx: index("profiles_popularity_idx").on(table.popularityScore),
     deletedAtIdx: index("profiles_deleted_at_idx").on(table.deletedAt),

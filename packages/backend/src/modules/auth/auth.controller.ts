@@ -115,7 +115,7 @@ export async function authRoutes(app: any) {
       .select({
         id: users.id,
         email: users.email,
-        role: users.role,
+        profileType: users.profileType,
         status: users.status,
         isVerified: users.isVerified,
         isPremium: users.isPremium,

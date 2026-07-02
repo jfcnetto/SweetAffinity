@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { db } from "../db/index.js";
-import { users, profiles } from "../db/schema.js";
-import { eq, desc, and } from "drizzle-orm";
+import { users, profiles, photos } from "../db/schema.js";
+import { eq, desc, and, sql } from "drizzle-orm";
 
 // =====================================================
 // ADMIN ROUTES
@@ -17,7 +17,7 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
       await request.jwtVerify();
 
       const user = request.user as {
-        id: string;
+        sub: string;
         profileType?: string;
       };
 
@@ -79,7 +79,7 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
   fastify.put("/users/:id/status", async (request, reply) => {
     const { id } = request.params as { id: string };
     const { status } = request.body as {
-      status: "active" | "blocked" | "deleted";
+      status: "active" | "inactive" | "suspended" | "banned";
     };
 
     try {
@@ -120,31 +120,31 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
 
   fastify.get("/photos/pending", async (request, reply) => {
     try {
-      const photos = await db.execute(sql`
-        SELECT 
-          ph.id,
-          ph.user_id,
-          ph.storage_path,
-          ph.is_primary,
-          ph.created_at,
-          p.display_name
-        FROM photos ph
-        INNER JOIN profiles p ON ph.user_id = p.id
-        WHERE ph.is_approved = false
-        ORDER BY ph.created_at ASC
-      `);
+      const pendingPhotos = await db
+        .select({
+          id: photos.id,
+          userId: photos.userId,
+          storagePath: photos.storagePath,
+          isPrimary: photos.isPrimary,
+          createdAt: photos.createdAt,
+          displayName: profiles.displayName,
+        })
+        .from(photos)
+        .innerJoin(profiles, eq(photos.userId, profiles.id))
+        .where(eq(photos.status, "pending"))
+        .orderBy(photos.createdAt);
 
       const MINIO_URL =
         process.env.MINIO_PUBLIC_URL ||
         "http://localhost:9000/sweet-photos";
 
-      const formatted = photos.rows.map((row: any) => ({
+      const formatted = pendingPhotos.map((row) => ({
         id: row.id,
-        user_id: row.user_id,
-        display_name: row.display_name,
-        is_primary: row.is_primary,
-        created_at: row.created_at,
-        url: `${MINIO_URL}/${row.storage_path}`,
+        user_id: row.userId,
+        display_name: row.displayName,
+        is_primary: row.isPrimary,
+        created_at: row.createdAt,
+        url: `${MINIO_URL}/${row.storagePath}`,
       }));
 
       return reply.send(formatted);
@@ -169,8 +169,7 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
         const result = await db
           .update(photos)
           .set({
-            isApproved: true,
-            updatedAt: new Date(),
+            status: "approved",  // corrigido: era isApproved: true
           })
           .where(eq(photos.id, id))
           .returning();

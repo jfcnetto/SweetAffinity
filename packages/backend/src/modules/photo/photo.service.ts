@@ -46,18 +46,50 @@ export const PhotoService = {
     await s3Client.send(new PutObjectCommand({ Bucket: process.env.MINIO_BUCKET, Key: thumbKey, Body: thumbBuffer }));
 
     // Persistência DB
-    return await db.insert(photos).values({
+    const [photoRecord] = await db.insert(photos).values({
       id: photoId,
       userId,
-      url: originalKey,
-      thumbnailUrl: thumbKey,
-      type: type, 
-      status: "pending",
+      storagePath: originalKey,    // corrigido: era url
+      thumbnailPath: thumbKey,     // corrigido: era thumbnailUrl
+      type: type,
+      status: "pending",           // corrigido: era isApproved: false
     }).returning();
+
+    return [photoRecord];
   },
 
   async deletePhoto(photoId: string, userId: string) {
-    // Implementação de exclusão (RN-017)
-    // 1. Buscar registro, 2. Deletar do MinIO, 3. Deletar do DB
-  }
-};
+    // RN-017: Exclusão atômica — primeiro MinIO, depois DB
+    const [photo] = await db
+      .select()
+      .from(photos)
+      .where(eq(photos.id, photoId));
+
+    if (!photo || photo.userId !== userId) {
+      throw new Error("Foto não encontrada ou sem permissão.");
+    }
+
+    // Remove original do MinIO
+    await s3Client.send(
+      new DeleteObjectCommand({
+        Bucket: process.env.MINIO_BUCKET,
+        Key: photo.storagePath,
+      })
+    );
+
+    // Remove thumbnail do MinIO (se existir)
+    if (photo.thumbnailPath) {
+      await s3Client.send(
+        new DeleteObjectCommand({
+          Bucket: process.env.MINIO_BUCKET,
+          Key: photo.thumbnailPath,
+        })
+      );
+    }
+
+    // Remove do banco
+    await db.delete(photos).where(eq(photos.id, photoId));
+
+    return { success: true };
+  },
+};

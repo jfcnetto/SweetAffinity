@@ -8,10 +8,10 @@ Desenvolvimento SweetAffinity
 
 continuando na fase 01 vamos para mais um item de desenvolvimento, portanto antes de iniciair desenvolver o codigo elabore a documentação ou seja especificação tecnica e funciona da seguinte  tarefa , sem esquecer do testes desenvolvimendo pensado como um Analista de qualidade. segue nossa tarefa
 
-commit CRUD de Perfis, Integração IBGE, Upload de Fotos (MinIO) e Rate Limiting com Redis
+commit  CRUD de Perfis, Integração IBGE, Upload de Fotos (MinIO) e Rate Limiting com Redis
 
 
-CRUD de Perfis, Integração IBGE, Upload de Fotos (MinIO) e Rate Limiting com Redis
+
 
 
 Perfeito! Vou ler toda a documentação antes de iniciar a análise.Documentação lida. Agora tenho o contexto completo: stack, regras de negócio, boas práticas e estrutura do projeto.

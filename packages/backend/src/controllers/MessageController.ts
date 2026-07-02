@@ -1,8 +1,8 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { Server, Socket } from "socket.io";
 import { db } from "../db/index.js";
-import { users } from "../db/schema.js";
-import { eq } from "drizzle-orm";
+import { users, messages } from "../db/schema.js";
+import { eq, or, and, asc } from "drizzle-orm";
 
 // =====================================================
 // ONLINE USERS (MEMORY LAYER)
@@ -25,20 +25,30 @@ export const messageRoutes = async (fastify: FastifyInstance) => {
       try {
         await request.jwtVerify();
 
-        const user = request.user as { id: string };
+        const user = request.user as { sub: string };
         const { receiverId } = request.params as {
           receiverId: string;
         };
 
-        const messages = await db.execute(sql`
-          SELECT id, sender_id, receiver_id, content, read_at, created_at
-          FROM messages
-          WHERE (sender_id = ${user.id} AND receiver_id = ${receiverId})
-             OR (sender_id = ${receiverId} AND receiver_id = ${user.id})
-          ORDER BY created_at ASC
-        `);
+        const history = await db
+          .select({
+            id: messages.id,
+            senderId: messages.senderId,
+            receiverId: messages.receiverId,
+            content: messages.content,
+            readAt: messages.readAt,
+            createdAt: messages.createdAt,
+          })
+          .from(messages)
+          .where(
+            or(
+              and(eq(messages.senderId, user.sub), eq(messages.receiverId, receiverId)),
+              and(eq(messages.senderId, receiverId), eq(messages.receiverId, user.sub))
+            )
+          )
+          .orderBy(asc(messages.createdAt));
 
-        return reply.send(messages.rows);
+        return reply.send(history);
       } catch (err) {
         fastify.log.error(err);
 
@@ -82,14 +92,14 @@ export const initChatSocket = (io: Server) => {
   });
 
   io.on("connection", (socket: Socket) => {
-    const user = socket.data.user as { id: string };
+    const user = socket.data.user as { sub: string };
 
     // =====================================================
     // REGISTER USER ONLINE
     // =====================================================
 
     socket.on("register_user", (userId: string) => {
-      if (!userId || userId !== user.id) return;
+      if (!userId || userId !== user.sub) return;
 
       onlineUsers.set(userId, socket.id);
 
@@ -112,19 +122,28 @@ export const initChatSocket = (io: Server) => {
       }) => {
         try {
           // 🔐 segurança: valida sender real
-          if (data.sender_id !== user.id) {
+          if (data.sender_id !== user.sub) {
             return socket.emit("message_error", {
               error: "Unauthorized sender",
             });
           }
 
-          const result = await db.execute(sql`
-            INSERT INTO messages (sender_id, receiver_id, content)
-            VALUES (${data.sender_id}, ${data.receiver_id}, ${data.content})
-            RETURNING id, sender_id, receiver_id, content, created_at;
-          `);
+          const result = await db
+            .insert(messages)
+            .values({
+              senderId: data.sender_id,
+              receiverId: data.receiver_id,
+              content: data.content,
+            })
+            .returning({
+              id: messages.id,
+              senderId: messages.senderId,
+              receiverId: messages.receiverId,
+              content: messages.content,
+              createdAt: messages.createdAt,
+            });
 
-          const savedMessage = result.rows[0];
+          const savedMessage = result[0];
 
           const receiverSocketId = onlineUsers.get(
             data.receiver_id

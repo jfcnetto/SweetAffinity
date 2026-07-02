@@ -2,9 +2,9 @@ import { FastifyPluginAsync } from "fastify";
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 
-import { db } from "../../db/index.js";
-import { users, profiles } from "../../db/schema.js";
-import { AuthService } from "./auth.service.js";
+import { db } from "../db/index.js";
+import { users, profiles } from "../db/schema.js";
+import { AuthService } from "../modules/auth/auth.service.js";
 
 // =====================================================
 // TYPES
@@ -13,7 +13,7 @@ import { AuthService } from "./auth.service.js";
 interface RegisterBody {
   email: string;
   password: string;
-  profileType?: "Baby" | "Daddy" | "Mommy";
+  profileType?: "baby" | "daddy" | "mommy";  // lowercase conforme schema enum
   displayName?: string;
   birthDate?: string;
   state?: string;
@@ -100,7 +100,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
 
     const passwordHash = await bcrypt.hash(body.password, 12); // FIX 3: custo 12 (não 10)
 
-    const result = await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx: any) => {
       const [createdUser] = await tx
         .insert(users)
         .values({
@@ -111,24 +111,27 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         })
         .returning();
 
-      await tx.insert(profiles).values({
-        id: createdUser.id,
-        displayName: body.displayName ?? null,
-        birthDate: body.birthDate ?? null,
-        state: body.state ?? null,
-        city: body.city ?? null,
-        gender: body.gender ?? null,
-        maritalStatus: body.maritalStatus ?? null,
-        heightRange: body.heightRange ?? null,
-        ethnicity: body.ethnicity ?? null,
-        hairColor: body.hairColor ?? null,
-        eyeColor: body.eyeColor ?? null,
-        smoking: body.smoking ?? null,
-        drinking: body.drinking ?? null,
-        education: body.education ?? null,
-        profession: body.profession ?? null,
-        incomeRange: body.incomeRange ?? null,
-      });
+      // Apenas insere o perfil se tiver os campos obrigatórios
+      if (body.displayName && body.birthDate) {
+        await tx.insert(profiles).values({
+          id: createdUser.id,
+          displayName: body.displayName,
+          birthDate: body.birthDate,
+          state: body.state ?? null,
+          city: body.city ?? null,
+          gender: body.gender ?? null,
+          maritalStatus: body.maritalStatus ?? null,
+          heightRange: body.heightRange ?? null,
+          ethnicity: body.ethnicity ?? null,
+          hairColor: body.hairColor ?? null,
+          eyeColor: body.eyeColor ?? null,
+          smoking: body.smoking ?? null,
+          drinking: body.drinking ?? null,
+          education: body.education ?? null,
+          profession: body.profession ?? null,
+          incomeRange: body.incomeRange ?? null,
+        });
+      }
 
       return createdUser;
     });

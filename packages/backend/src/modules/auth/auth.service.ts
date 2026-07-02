@@ -29,7 +29,7 @@ export class AuthService {
         .returning({
           id: users.id,
           email: users.email,
-          role: users.role,
+          profileType: users.profileType,
           status: users.status,
           isVerified: users.isVerified,
           isPremium: users.isPremium,
@@ -91,7 +91,7 @@ export class AuthService {
     return app.jwt.sign(
       {
         sub: user.id,
-        role: user.role,
+        profileType: user.profileType,
       },
       {
         expiresIn: "15m",
@@ -119,9 +119,9 @@ export class AuthService {
 
   // =====================================================
   // ROTATE REFRESH TOKEN
+  // Retorna { userId, newRefreshToken } — conforme AuthController.ts
   // =====================================================
   static async rotateRefreshToken(oldToken: string) {
-    // FIX 5: trocar db.query.* por db.select() pelo mesmo motivo do login
     const result = await db
       .select()
       .from(refreshTokens)
@@ -138,17 +138,21 @@ export class AuthService {
       throw new Error("REFRESH_TOKEN_EXPIRED");
     }
 
-    // Revogar o token usado (rotation)
+    // Revogar o token usado (rotation — single use)
     await db
       .update(refreshTokens)
       .set({ revokedAt: new Date() })
       .where(eq(refreshTokens.id, stored.id));
 
-    return stored.userId;
+    // Gerar novo refresh token (rotacionado)
+    const newRefreshToken = await AuthService.generateRefreshToken(stored.userId);
+
+    return { userId: stored.userId, newRefreshToken };
   }
 
   // =====================================================
   // REVOKE ALL TOKENS (logout completo)
+  // Alias: revokeRefreshTokens (para compatibilidade com AuthController.ts)
   // =====================================================
   static async revokeAllRefreshTokens(userId: string) {
     await db
@@ -156,4 +160,7 @@ export class AuthService {
       .set({ revokedAt: new Date() })
       .where(eq(refreshTokens.userId, userId));
   }
+
+  // Alias para compatibilidade com AuthController.ts
+  static revokeRefreshTokens = AuthService.revokeAllRefreshTokens;
 }
