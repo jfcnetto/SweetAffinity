@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { db } from "../db/index.js";
 import { users, profiles, swipes, matches, swipeActionEnum } from "../db/schema.js";
-import { eq, and, ne, notInArray, or, inArray } from "drizzle-orm";
+import { eq, and, ne, notInArray, or, inArray, sql } from "drizzle-orm";
 
 export async function matchRoutes(app: FastifyInstance) {
   // Autenticação obrigatória
@@ -55,7 +55,6 @@ export async function matchRoutes(app: FastifyInstance) {
       swipedIds.push(userId); // Adiciona o próprio usuário pra não curtir a si mesmo
 
       // Build filters dynamically
-      import { sql } from 'drizzle-orm';
       
       const conditions = [
         eq(users.status, "active"),

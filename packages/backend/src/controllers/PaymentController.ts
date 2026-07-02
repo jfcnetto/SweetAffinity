@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 
 // Instância do Stripe. Usando chave dummy fallback caso não configurada.
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_dummy_123", {
-  apiVersion: "2025-01-27.acacia",
+  apiVersion: "2024-06-20" as any,
 });
 
 export async function paymentRoutes(app: FastifyInstance) {

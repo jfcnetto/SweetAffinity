@@ -28,6 +28,12 @@ import { adminRoutes } from "./controllers/AdminController.js";
 import { matchRoutes } from "./controllers/MatchController.js";
 import { paymentRoutes } from "./controllers/PaymentController.js";
 import { notificationRoutes } from "./controllers/NotificationController.js";
+import { lgpdRoutes } from "./controllers/LgpdController.js";
+
+// Segurança & Monitoramento
+import helmet from "@fastify/helmet";
+import * as Sentry from "@sentry/node";
+import { nodeProfilingIntegration } from "@sentry/profiling-node";
 
 // =====================================================
 // FASTIFY
@@ -65,13 +71,36 @@ server.get("/health", async () => {
 
 async function start() {
   try {
+    // Inicialização do Sentry (Monitoramento)
+    Sentry.init({
+      dsn: process.env.SENTRY_DSN || "",
+      integrations: [nodeProfilingIntegration()],
+      tracesSampleRate: 1.0,
+      profilesSampleRate: 1.0,
+      environment: process.env.NODE_ENV || "development",
+    });
+
+    server.setErrorHandler(function (error, request, reply) {
+      if (process.env.NODE_ENV === "production") {
+        Sentry.captureException(error);
+      }
+      this.log.error(error);
+      // Retorna 500 para não vazar a stacktrace da AWS/DB para o cliente
+      reply.status(500).send({ message: "Internal Server Error" });
+    });
+
     server.log.info("🔄 Verificando conexão com PostgreSQL...");
     await testDatabase();
     server.log.info("✅ Banco conectado");
 
     // =====================================================
-    // PLUGINS (ordem obrigatória: cors → rateLimit → multipart → jwt)
+    // PLUGINS (ordem obrigatória: cors/helmet → rateLimit → multipart → jwt)
     // =====================================================
+
+    // Segurança contra OWASP Top 10 (Cabeçalhos HTTP)
+    await server.register(helmet, {
+      global: true,
+    });
 
     await server.register(cors, {
       origin: process.env.APP_URL || "http://localhost:3000",
@@ -102,7 +131,12 @@ async function start() {
           id: process.env.GOOGLE_CLIENT_ID || 'DUMMY_CLIENT_ID',
           secret: process.env.GOOGLE_CLIENT_SECRET || 'DUMMY_CLIENT_SECRET'
         },
-        auth: oauthPlugin.GOOGLE_CONFIGURATION
+        auth: {
+          tokenHost: 'https://oauth2.googleapis.com',
+          tokenPath: '/token',
+          authorizeHost: 'https://accounts.google.com',
+          authorizePath: '/o/oauth2/v2/auth'
+        }
       },
       // startRedirectPath: URL que o frontend vai chamar para iniciar o fluxo
       startRedirectPath: '/auth/google',
@@ -147,6 +181,10 @@ async function start() {
 
     await server.register(notificationRoutes, {
       prefix: "/notifications",
+    });
+
+    await server.register(lgpdRoutes, {
+      prefix: "/lgpd",
     });
 
     // =====================================================

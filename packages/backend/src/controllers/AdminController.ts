@@ -104,7 +104,7 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
 
       // Adicionando Log de Auditoria
       const userObj = request.user as any;
-      import { auditLogs } from "../db/schema.js";
+      const { auditLogs } = await import("../db/schema.js");
       await db.insert(auditLogs).values({
         adminId: userObj.sub,
         action: `update_user_status_${status}`,
@@ -177,7 +177,7 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
 
     try {
       const userObj = request.user as any;
-      import { auditLogs } from "../db/schema.js";
+      const { auditLogs } = await import("../db/schema.js");
 
       if (approved) {
         const result = await db

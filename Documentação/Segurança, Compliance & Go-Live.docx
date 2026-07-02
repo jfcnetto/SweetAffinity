@@ -1,0 +1,62 @@
+# Fase 09: Segurança, Compliance & Go-Live
+
+Chegamos à fase final de engenharia antes do lançamento! Como você bem observou, algumas partes dessa fase envolvem configurações externas (Cloudflare, VPS), mas o núcleo da aplicação precisa ser blindado e preparado em código para essas integrações. 
+
+Aqui está como vamos resolver as exigências de código para a Fase 09:
+
+## User Review Required
+> [!IMPORTANT]
+> - **Sentry (Logs):** Para o Sentry funcionar no monitoramento de erros de produção, você precisará criar uma conta (gratuita) em sentry.io e obter o DSN (uma URL chave) que colocaremos no `.env`.
+> - **Infraestrutura VPS/Cloudflare:** O setup real de servidores é feito fora do código, mas deixarei a fundação perfeitamente estruturada para você ou o DevOps (Dockerfile, Scripts).
+
+## Proposed Changes
+
+---
+
+### 1. Segurança (Blindagem OWASP Top 10)
+Como usamos *Drizzle ORM*, estamos naturalmente blindados contra **SQL Injection**. Como usamos *React*, temos proteção pesada contra **XSS**. Para fechar a segurança:
+
+#### [MODIFY] `packages/backend/src/index.ts`
+- Adicionaremos **Fastify Helmet** para injetar cabeçalhos de segurança (CSP, HSTS, anti-clickjacking).
+- Revisão nas políticas de CORS (já estão seguras) e Rate Limiting (anti-DDoS/Brute Force).
+
+---
+
+### 2. Compliance (LGPD & Direito de Esquecimento)
+O usuário deve poder baixar todos os seus dados e apagar sua própria conta permanentemente (Direito ao esquecimento).
+
+#### [NEW] `packages/backend/src/controllers/LgpdController.ts`
+- `GET /api/lgpd/export`: Coleta todos os dados de Perfil, Preferências, Swipes e Matches do usuário logado e retorna como um único arquivo `.json`.
+- `DELETE /api/lgpd/delete`: Script agressivo de "Hard Delete" que limpa completamente todos os rastros do usuário do banco de dados (exclusão definitiva), diferente do soft delete atual.
+
+---
+
+### 3. Monitoramento de Erros (Sentry)
+Se a aplicação travar ou um pagamento falhar, você precisa ser notificado na hora, com detalhes técnicos completos de onde ocorreu o erro.
+
+#### [MODIFY] `packages/backend/package.json`
+- Instalação de `@sentry/node` e `@sentry/profiling-node`.
+
+#### [MODIFY] `packages/backend/src/index.ts`
+- Inicialização oficial do `@sentry/node` integrado ao hook global de erros do Fastify (capturando apenas quando estivermos em Produção).
+
+---
+
+### 4. Backups de Banco de Dados
+A automação de dumps diários.
+
+#### [NEW] `scripts/db-backup.sh`
+- Criação de um script `.sh` genérico (pronto para cronjobs em Linux/VPS) que fará o `pg_dump` do PostgreSQL, compactará para `.gz` e apagará automaticamente backups com mais de 30 dias de retenção.
+
+## Verification Plan
+
+### Automated Tests
+- Os testes atuais de rotas continuam válidos.
+- Validarei as rotas de LGPD manualmente.
+
+### Manual Verification
+1. Faremos um teste prático de Exportação de Dados via requisição (simulando um usuário querendo seus dados LGPD).
+2. Simularemos um erro fatal (throw Error) em uma rota de teste para checar se o Sentry tenta capturá-lo.
+3. Testarei a sintaxe do script de backup.
+
+Aprova este plano arquitetural para finalizarmos os requisitos da Fase 09 em código?

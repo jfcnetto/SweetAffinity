@@ -113,15 +113,7 @@ export class AuthService {
           // name // O Drizzle Schema atual talvez não tenha display_name logo de cara.
           // Iremos apenas criar o user por enquanto. O usuário deve completar o onboarding.
         })
-        .returning({
-          id: users.id,
-          email: users.email,
-          profileType: users.profileType,
-          status: users.status,
-          isVerified: users.isVerified,
-          isPremium: users.isPremium,
-          createdAt: users.createdAt,
-        });
+        .returning();
       
       user = newUser;
     } else {

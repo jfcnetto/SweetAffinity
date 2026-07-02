@@ -2,12 +2,10 @@ import { FastifyInstance } from "fastify";
 import { db } from "../db/index.js";
 import { notifications } from "../db/schema.js";
 import { eq, desc } from "drizzle-orm";
-import { getSocketServer } from "../socket.js"; // Se existir
-
 export async function notificationRoutes(server: FastifyInstance) {
   // Obter notificações do usuário
   server.get("/", async (request, reply) => {
-    const user = request.user as { id: string };
+    const user = request.user as { sub: string };
     
     if (!user) {
       return reply.status(401).send({ error: "Unauthorized" });
@@ -17,7 +15,7 @@ export async function notificationRoutes(server: FastifyInstance) {
       const userNotifications = await db
         .select()
         .from(notifications)
-        .where(eq(notifications.userId, user.id))
+        .where(eq(notifications.userId, user.sub))
         .orderBy(desc(notifications.createdAt))
         .limit(20);
 
@@ -30,7 +28,7 @@ export async function notificationRoutes(server: FastifyInstance) {
 
   // Marcar como lida
   server.put("/:id/read", async (request, reply) => {
-    const user = request.user as { id: string };
+    const user = request.user as { sub: string };
     const { id } = request.params as { id: string };
 
     if (!user) {

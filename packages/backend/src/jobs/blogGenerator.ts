@@ -1,5 +1,5 @@
-import { db } from '../db';
-import { blogPosts } from '../db/schema';
+import { db } from '../db/index.js';
+import { blogPosts } from '../db/schema.js';
 import crypto from 'crypto';
 
 // Simulação de chamada para API Gemini/ChatGPT
