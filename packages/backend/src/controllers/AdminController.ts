@@ -1,7 +1,7 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import { FastifyInstance, FastifyReply } from "fastify";
 import { db } from "../db/index.js";
-import { users, profiles, photos } from "../db/schema.js";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { users, profiles, photos, reports, auditLogs, subscriptions } from "../db/schema.js";
+import { eq, desc, sql } from "drizzle-orm";
 
 // =====================================================
 // ADMIN ROUTES
@@ -242,6 +242,7 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
 
   // =====================================================
   // 5. DASHBOARD FINANCEIRO E KPIS
+  // Spec: GET /admin/financial + GET /admin/analytics
   // =====================================================
 
   fastify.get("/dashboard", async (request, reply) => {
@@ -258,7 +259,7 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
       `);
       const activeSubs = subsResult.rows[0].active_subs;
       const mrr = subsResult.rows[0].mrr_cents ? Number(subsResult.rows[0].mrr_cents) / 100 : 0;
-      
+
       // ARR (Annual Recurring Revenue)
       const arr = mrr * 12;
 
@@ -266,18 +267,220 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
       const matchesResult = await db.execute(sql`SELECT count(*) FROM matches`);
       const totalMatches = matchesResult.rows[0].count;
 
+      // 4. Total de denúncias pendentes
+      const reportsResult = await db.execute(sql`SELECT count(*) FROM reports WHERE status = 'pending'`);
+      const pendingReports = reportsResult.rows[0].count;
+
       return reply.send({
         totalActiveUsers: Number(totalActiveUsers),
         activeSubscriptions: Number(activeSubs),
         mrr,
         arr,
-        totalMatches: Number(totalMatches)
+        totalMatches: Number(totalMatches),
+        pendingReports: Number(pendingReports),
       });
     } catch (error) {
       fastify.log.error(error);
       return reply.status(500).send({
         message: "Erro ao gerar KPIs do Dashboard.",
       });
+    }
+  });
+
+  // =====================================================
+  // 6. RELATÓRIO DE DENÚNCIAS (REPORTS)
+  // Spec: GET /admin/reports — Admin JWT Token
+  // Seção 6.1: Central de denúncias categorizadas por gravidade e cronologia
+  // =====================================================
+
+  fastify.get("/reports", async (request, reply: FastifyReply) => {
+    const { status = "pending", limit = 20, offset = 0 } = request.query as {
+      status?: "pending" | "resolved" | "dismissed";
+      limit?: number;
+      offset?: number;
+    };
+
+    try {
+      const result = await db.execute(sql`
+        SELECT
+          r.id,
+          r.reason,
+          r.description,
+          r.status,
+          r.created_at,
+          r.resolution_note,
+          reporter.id   AS reporter_id,
+          rp_reporter.display_name AS reporter_name,
+          reported.id   AS reported_id,
+          rp_reported.display_name AS reported_name
+        FROM reports r
+        JOIN users reporter  ON r.reporter_id = reporter.id
+        JOIN users reported  ON r.reported_id = reported.id
+        LEFT JOIN profiles rp_reporter ON rp_reporter.id = reporter.id
+        LEFT JOIN profiles rp_reported ON rp_reported.id = reported.id
+        WHERE r.status = ${status}
+        ORDER BY r.created_at DESC
+        LIMIT ${Number(limit)}
+        OFFSET ${Number(offset)}
+      `);
+
+      const totalResult = await db.execute(
+        sql`SELECT count(*) FROM reports WHERE status = ${status}`
+      );
+
+      return reply.send({
+        data: result.rows,
+        total: Number(totalResult.rows[0].count),
+        limit: Number(limit),
+        offset: Number(offset),
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.status(500).send({ message: "Erro ao listar denúncias." });
+    }
+  });
+
+  // =====================================================
+  // 7. RESOLVER / DISPENSAR UMA DENÚNCIA
+  // Spec: Admin deve poder aplicar punições e registrar resolução
+  // =====================================================
+
+  fastify.put("/reports/:id/resolve", async (request, reply: FastifyReply) => {
+    const { id } = request.params as { id: string };
+    const { action, resolutionNote } = request.body as {
+      action: "resolved" | "dismissed";
+      resolutionNote?: string;
+    };
+    const adminUser = request.user as any;
+
+    try {
+      await db
+        .update(reports)
+        .set({
+          status: action,
+          resolvedBy: adminUser.sub,
+          resolvedAt: new Date(),
+          resolutionNote: resolutionNote ?? null,
+        })
+        .where(eq(reports.id, id));
+
+      // Log de auditoria
+      await db.insert(auditLogs).values({
+        adminId: adminUser.sub,
+        action: `report_${action}`,
+        entity: "report",
+        entityId: id,
+        details: { resolutionNote },
+      });
+
+      return reply.send({ success: true, message: `Denúncia marcada como '${action}'.` });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.status(500).send({ message: "Erro ao resolver denúncia." });
+    }
+  });
+
+  // =====================================================
+  // 8. ANALYTICS GERAIS
+  // Spec: GET /admin/analytics — Admin JWT Token
+  // Seção 6.2: KPIs (MRR, Churn, Conversão, etc.)
+  // =====================================================
+
+  fastify.get("/analytics", async (request, reply: FastifyReply) => {
+    try {
+      // Novos usuários nos últimos 30 dias
+      const newUsersResult = await db.execute(sql`
+        SELECT count(*) FROM users
+        WHERE created_at >= now() - interval '30 days'
+      `);
+
+      // Usuários premium ativos
+      const premiumResult = await db.execute(sql`
+        SELECT count(*) FROM users WHERE is_premium = true AND status = 'active'
+      `);
+
+      // Total de usuários
+      const totalUsersResult = await db.execute(sql`SELECT count(*) FROM users`);
+
+      // MRR detalhado por plano
+      const mrrByPlanResult = await db.execute(sql`
+        SELECT plan_id, count(*) as qty, sum(amount) as total_cents
+        FROM subscriptions
+        WHERE status = 'active'
+        GROUP BY plan_id
+      `);
+
+      // Taxa de conversão (Free -> Premium)
+      const totalUsers = Number(totalUsersResult.rows[0].count);
+      const premiumUsers = Number(premiumResult.rows[0].count);
+      const conversionRate = totalUsers > 0
+        ? ((premiumUsers / totalUsers) * 100).toFixed(2)
+        : "0.00";
+
+      // Cancelamentos (churn) nos últimos 30 dias
+      const churnResult = await db.execute(sql`
+        SELECT count(*) FROM subscriptions
+        WHERE status = 'cancelled'
+        AND updated_at >= now() - interval '30 days'
+      `);
+
+      return reply.send({
+        newUsersLast30Days: Number(newUsersResult.rows[0].count),
+        totalUsers,
+        premiumUsers,
+        conversionRate: `${conversionRate}%`,
+        churnLast30Days: Number(churnResult.rows[0].count),
+        mrrByPlan: mrrByPlanResult.rows.map((row: any) => ({
+          planId: row.plan_id,
+          quantity: Number(row.qty),
+          totalBRL: Number(row.total_cents) / 100,
+        })),
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.status(500).send({ message: "Erro ao gerar analytics." });
+    }
+  });
+
+  // =====================================================
+  // 9. ALIASES: /approve e /ban (Spec: PUT /admin/users/:id/approve + ban)
+  // =====================================================
+
+  fastify.put("/users/:id/approve", async (request, reply: FastifyReply) => {
+    const { id } = request.params as { id: string };
+    const adminUser = request.user as any;
+    try {
+      await db.update(users).set({ status: "active", isVerified: true }).where(eq(users.id, id));
+      await db.insert(auditLogs).values({
+        adminId: adminUser.sub,
+        action: "approve_user",
+        entity: "user",
+        entityId: id,
+        details: {},
+      });
+      return reply.send({ success: true, message: "Usuário aprovado com sucesso." });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.status(500).send({ message: "Erro ao aprovar usuário." });
+    }
+  });
+
+  fastify.put("/users/:id/ban", async (request, reply: FastifyReply) => {
+    const { id } = request.params as { id: string };
+    const adminUser = request.user as any;
+    try {
+      await db.update(users).set({ status: "banned" }).where(eq(users.id, id));
+      await db.insert(auditLogs).values({
+        adminId: adminUser.sub,
+        action: "ban_user",
+        entity: "user",
+        entityId: id,
+        details: {},
+      });
+      return reply.send({ success: true, message: "Usuário banido com sucesso." });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.status(500).send({ message: "Erro ao banir usuário." });
     }
   });
 };

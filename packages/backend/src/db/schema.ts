@@ -93,6 +93,22 @@ export const swipeActionEnum = pgEnum("swipe_action", [
   "pass",
 ]);
 
+export const reportStatusEnum = pgEnum("report_status", [
+  "pending",
+  "resolved",
+  "dismissed",
+]);
+
+export const reportReasonEnum = pgEnum("report_reason", [
+  "fake_profile",
+  "harassment",
+  "spam",
+  "underage",
+  "nudity",
+  "prostitution",
+  "other",
+]);
+
 // =====================================================
 // USERS
 // =====================================================
@@ -502,5 +518,47 @@ export const notifications = pgTable(
   (table) => ({
     userIdx: index("notifications_user_idx").on(table.userId),
     readIdx: index("notifications_read_idx").on(table.isRead),
+  })
+);
+
+// =====================================================
+// REPORTS (Denúncias de perfis)
+// Spec: seção 5.4 — Central de denúncias categorizadas por gravidade
+// =====================================================
+
+export const reports = pgTable(
+  "reports",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    // Quem denunciou
+    reporterId: uuid("reporter_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+
+    // Quem foi denunciado
+    reportedId: uuid("reported_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+
+    reason: reportReasonEnum("reason").notNull(),
+
+    description: text("description"), // Detalhes opcionais
+
+    status: reportStatusEnum("status").notNull().default("pending"),
+
+    // Administrador que tratou a denúncia
+    resolvedBy: uuid("resolved_by").references(() => users.id, { onDelete: "set null" }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    resolutionNote: text("resolution_note"),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    reporterIdx: index("reports_reporter_idx").on(table.reporterId),
+    reportedIdx: index("reports_reported_idx").on(table.reportedId),
+    statusIdx: index("reports_status_idx").on(table.status),
   })
 );

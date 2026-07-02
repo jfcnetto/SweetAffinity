@@ -29,6 +29,7 @@ import { matchRoutes } from "./controllers/MatchController.js";
 import { paymentRoutes } from "./controllers/PaymentController.js";
 import { notificationRoutes } from "./controllers/NotificationController.js";
 import { lgpdRoutes } from "./controllers/LgpdController.js";
+import { subscriptionRoutes } from "./controllers/SubscriptionController.js";
 
 // Segurança & Monitoramento
 import helmet from "@fastify/helmet";
@@ -185,6 +186,10 @@ async function start() {
 
     await server.register(lgpdRoutes, {
       prefix: "/lgpd",
+    });
+
+    await server.register(subscriptionRoutes, {
+      prefix: "/subscriptions",
     });
 
     // =====================================================
