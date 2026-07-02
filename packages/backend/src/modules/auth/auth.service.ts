@@ -85,6 +85,59 @@ export class AuthService {
   }
 
   // =====================================================
+  // GOOGLE LOGIN (OAuth)
+  // =====================================================
+  static async loginWithGoogle(email: string, name?: string) {
+    const cleanEmail = email.toLowerCase().trim();
+
+    // Busca usuário existente
+    const result = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, cleanEmail))
+      .limit(1);
+
+    let user = result[0];
+
+    if (!user) {
+      // Cria um usuário novo caso não exista
+      // A senha recebe um hash aleatório impossível de descobrir, já que o login será via Google.
+      const randomPassword = crypto.randomBytes(32).toString("hex");
+      const passwordHash = await bcrypt.hash(randomPassword, 10);
+
+      const [newUser] = await db
+        .insert(users)
+        .values({
+          email: cleanEmail,
+          passwordHash,
+          // name // O Drizzle Schema atual talvez não tenha display_name logo de cara.
+          // Iremos apenas criar o user por enquanto. O usuário deve completar o onboarding.
+        })
+        .returning({
+          id: users.id,
+          email: users.email,
+          profileType: users.profileType,
+          status: users.status,
+          isVerified: users.isVerified,
+          isPremium: users.isPremium,
+          createdAt: users.createdAt,
+        });
+      
+      user = newUser;
+    } else {
+      if (user.status === "banned" || user.status === "suspended") {
+        throw new Error("ACCOUNT_SUSPENDED");
+      }
+      
+      // Remove passwordHash pra retornar safeUser
+      const { passwordHash: _, ...safeUser } = user as any;
+      user = safeUser;
+    }
+
+    return user;
+  }
+
+  // =====================================================
   // ACCESS TOKEN (JWT)
   // =====================================================
   static generateAccessToken(app: any, user: any) {

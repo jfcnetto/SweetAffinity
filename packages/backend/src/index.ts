@@ -3,6 +3,7 @@ import "./env.js";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
+import oauthPlugin from "@fastify/oauth2";
 import { Server } from "socket.io";
 
 // DB
@@ -87,6 +88,25 @@ async function start() {
     });
 
     await server.register(jwtPlugin);
+
+    // =====================================================
+    // OAUTH2 (GOOGLE)
+    // =====================================================
+    await server.register(oauthPlugin, {
+      name: 'googleOAuth2',
+      credentials: {
+        client: {
+          id: process.env.GOOGLE_CLIENT_ID || 'DUMMY_CLIENT_ID',
+          secret: process.env.GOOGLE_CLIENT_SECRET || 'DUMMY_CLIENT_SECRET'
+        },
+        auth: oauthPlugin.GOOGLE_CONFIGURATION
+      },
+      // startRedirectPath: URL que o frontend vai chamar para iniciar o fluxo
+      startRedirectPath: '/auth/google',
+      // callbackUri: URL registrada no Google Cloud Console
+      callbackUri: 'http://localhost:4000/auth/google/callback',
+      scope: ['profile', 'email']
+    });
 
     // =====================================================
     // ROUTES

@@ -1,0 +1,79 @@
+# Documento de Especificação Técnica e Plano de Testes — FASE 02
+
+**Título da Fase:** Acoplamento do Frontend & Auth Real
+**Objetivo:** Integrar as interfaces de autenticação (`AuthModal.tsx`, `PhotoUpload.tsx`) com o backend Fastify/Supabase e gerenciar o estado global de sessão.
+**Período:** Semana 4
+**Dependências:** Endpoints de autenticação da Fase 1 e pipeline de Upload (MinIO).
+
+---
+
+## 1. Especificação Funcional
+
+A Fase 02 consiste na remoção dos "mocks" do front-end e ligação das interfaces com a API real, além de estabelecer a segurança no cliente.
+
+### 1.1 Autenticação Nativa (E-mail/Senha)
+- Substituir estado local (`useState`) no `AuthModal.tsx` por requisições `POST /auth/register` e `POST /auth/login`.
+- Em caso de sucesso, capturar os tokens (`accessToken` e `refreshToken`) no payload da resposta e armazená-los no `LocalStorage`.
+- Lidar com cenários de erro (`401 Unauthorized`, `409 Conflict`) exibindo *toasts* amigáveis ao usuário.
+
+### 1.2 Estado Global e Roteamento
+- Criar um provedor React (`AuthContext.tsx`) que envelopará o `_app.tsx` / `layout.tsx`.
+- O contexto vai decodificar e armazenar os dados do JWT (`sub`, `relationshipType`, `exp`) e gerenciar o envio automático de refresh tokens (`POST /auth/refresh`).
+- Criar o componente HOC (High-Order Component) `PrivateRoute.tsx` para barrar acesso de visitantes em rotas exclusivas (ex: `/feed`, `/settings`).
+
+### 1.4 Upload de Fotos
+- O componente `PhotoUpload.tsx` fará `POST /photos/upload` enviando a imagem com `FormData`.
+- O backend já gera o *thumbnail*. O frontend deverá receber a URL da resposta e exibir um preview de sucesso.
+
+---
+
+## 2. Especificação Técnica (Desenvolvedor & Arquiteto)
+
+### Módulos Frontend Impactados
+- `src/components/AuthModal.tsx`
+- `src/components/PhotoUpload.tsx`
+- `src/contexts/AuthContext.tsx` [NOVO]
+- `src/components/PrivateRoute.tsx` [NOVO]
+- `src/services/api.ts` [NOVO] -> Instância do Axios/Fetch configurada com *Interceptor* para injetar o header `Authorization: Bearer <token>`.
+
+### Fluxo de Componentes
+1. O usuário abre o modal e faz login.
+2. `api.ts` dispara `POST /auth/login`.
+3. Recebe o token, aciona o `login()` no `AuthContext`.
+4. O `AuthContext` salva no LocalStorage (ou atualiza Cookie) e muda o estado `isAuthenticated = true`.
+5. O componente Navbar reage re-renderizando para "Meu Perfil".
+
+---
+
+## 3. Plano de Testes (Perspectiva QA)
+
+Os testes seguirão uma abordagem ponta-a-ponta e de unidade no frontend.
+
+### CA-A01: Login Nativo com Sucesso
+**Pré-condição:** Usuário cadastrado no banco.
+**Ação:** Preencher e-mail/senha válidos e clicar em Entrar.
+**Resultado Esperado:** O AuthModal fecha, um token é guardado e a navegação muda para logado.
+
+### CA-A02: Tratamento de Erros
+**Ação:** Preencher senha errada.
+**Resultado Esperado:** Mensagem "Credenciais Inválidas" deve ser exibida. O Modal não deve fechar.
+
+### CA-A03: Proteção de Rota (Private Route)
+**Pré-condição:** Usuário deslogado.
+**Ação:** Acessar diretamente a rota protegida pela URL (ex: `/feed`).
+**Resultado Esperado:** Redirecionamento automático para a `/` ou exibição forçada do AuthModal.
+
+### CA-A04: Upload de Fotos (Form Data)
+**Pré-condição:** Usuário logado no contexto.
+**Ação:** Selecionar um `.jpg` no componente `PhotoUpload` e enviar.
+**Resultado Esperado:** Barra de progresso enche, a API responde 201 e o preview da imagem (thumbnail retornado) atualiza na tela.
+
+---
+
+## Open Questions & User Review Required
+
+> [!WARNING]
+> **Armazenamento de Sessão:** O JWT será guardado via Cookies ou LocalStorage no frontend? Recomendo **Cookies `httpOnly`** gerados pelo backend por questões de segurança (prevenção de XSS). Porém, precisaremos ajustar o endpoint de Login da Fase 1 para setar o cookie se optarmos por isso. Se a pressa for maior, podemos usar `LocalStorage` temporariamente. Como prefere?
+
+> [!IMPORTANT]
+> A documentação pedida era em formato `.docx`. Devido a limitações de ambiente puro texto no VS Code, gerei este artefato super completo em Markdown (o formato padrão de leitura de Git/Docs). Você pode, inclusive, exportá-lo diretamente para PDF/Word através do seu ambiente. Confirma se essa estrutura de artefato (Especificação + QA + Tech) atende o que você queria? Se sim, **aguardo o OK para iniciarmos os códigos!**

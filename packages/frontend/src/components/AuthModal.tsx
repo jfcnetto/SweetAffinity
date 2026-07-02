@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
+import { api } from '../services/api.js';
+import { useAuth } from '../contexts/AuthContext.js';
 
 interface AuthModalProps {
   onClose: () => void;
@@ -65,7 +68,7 @@ const professionOptions = [
 
 const AuthModal: React.FC<AuthModalProps> = ({ onClose, initialMode, onRegistrationComplete, onLoginSuccess, navigateTo }) => {
     const [mode, setMode] = useState(initialMode);
-    const API_URL = 'http://localhost:4000'; // Endereço do nosso servidor Fastify local
+    const { login } = useAuth();
 
     // Registration state
     const [birthDate, setBirthDate] = useState('');
@@ -180,25 +183,19 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, initialMode, onRegistrat
         };
 
         try {
-            const response = await fetch(`${API_URL}/auth/register`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || 'Falha ao processar o cadastro.');
+            const response = await api.post('/auth/register', payload);
+            
+            const data = response.data;
+            if (data.accessToken && data.refreshToken) {
+                login(data.accessToken, data.refreshToken);
             }
-
-            if (data.token) {
-                localStorage.setItem('sweet_token', data.token);
-            }
-
+            
+            toast.success('Cadastro realizado com sucesso!');
             onRegistrationComplete(profileType);
         } catch (error: any) {
-            setRegisterError(error.message || 'Erro de conexão com o servidor.');
+            const msg = error.response?.data?.message || 'Erro de conexão com o servidor.';
+            setRegisterError(msg);
+            toast.error(msg);
         }
     };
 
@@ -208,29 +205,25 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, initialMode, onRegistrat
         setLoginError('');
 
         try {
-            const response = await fetch(`${API_URL}/auth/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: loginEmail, password: loginPassword })
+            const response = await api.post('/auth/login', { 
+                email: loginEmail, 
+                password: loginPassword 
             });
 
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || 'E-mail ou senha inválidos.');
-            }
-
-            // Armazena com segurança o token de sessão localmente
-            localStorage.setItem('sweet_token', data.token);
+            const data = response.data;
+            
+            login(data.accessToken, data.refreshToken);
+            toast.success('Bem-vindo de volta!');
             onLoginSuccess();
         } catch (error: any) {
-            setLoginError(error.message || 'Erro ao conectar à API.');
+            const msg = error.response?.data?.message || 'Erro ao conectar à API.';
+            setLoginError(msg);
+            toast.error(msg);
         }
     };
     
     const handleGoogleSignUp = () => {
-        // Redireciona para o fluxo OAuth do nosso backend Fastify
-        window.location.href = `${API_URL}/auth/google`;
+        window.location.href = `http://localhost:4000/auth/google`;
     };
     
     const renderLogin = () => (

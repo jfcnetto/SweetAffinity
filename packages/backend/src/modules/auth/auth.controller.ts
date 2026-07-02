@@ -3,6 +3,7 @@ import { authGuard } from "./auth.guard.js";
 import { db } from "../../db/index.js";
 import { users } from "../../db/schema.js";
 import { eq } from "drizzle-orm";
+import axios from "axios";
 
 export async function authRoutes(app: any) {
 
@@ -87,6 +88,41 @@ export async function authRoutes(app: any) {
         return reply.status(401).send({ message: "Sessão expirada. Faça login novamente." });
       }
       throw err;
+    }
+  });
+
+  // =====================================================
+  // GET /auth/google/callback
+  // =====================================================
+  app.get("/auth/google/callback", async (req: any, reply: any) => {
+    try {
+      // O plugin @fastify/oauth2 injeta getAccessTokenFromAuthorizationCodeFlow() no app.googleOAuth2
+      const { token } = await app.googleOAuth2.getAccessTokenFromAuthorizationCodeFlow(req);
+      
+      // Busca os dados do usuário no Google
+      const userInfoResponse = await axios.get("https://www.googleapis.com/oauth2/v2/userinfo", {
+        headers: {
+          Authorization: `Bearer ${token.access_token}`
+        }
+      });
+      
+      const googleUser = userInfoResponse.data;
+      
+      // Procura ou cria o usuário na base (Google Login)
+      const user = await AuthService.loginWithGoogle(googleUser.email, googleUser.name);
+      
+      // Gera os nossos tokens
+      const accessToken = AuthService.generateAccessToken(app, user);
+      const refreshToken = await AuthService.generateRefreshToken(user.id);
+      
+      // Redireciona de volta para o frontend (passando tokens na URL para o AuthContext capturar)
+      const frontendUrl = process.env.APP_URL || "http://localhost:3000";
+      return reply.redirect(`${frontendUrl}/?access_token=${accessToken}&refresh_token=${refreshToken}`);
+
+    } catch (err: any) {
+      req.log.error(err);
+      const frontendUrl = process.env.APP_URL || "http://localhost:3000";
+      return reply.redirect(`${frontendUrl}/?auth_error=google_failed`);
     }
   });
 

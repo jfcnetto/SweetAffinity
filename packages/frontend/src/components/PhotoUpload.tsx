@@ -1,4 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
+import toast from 'react-hot-toast';
+import { api } from '../services/api.js';
 
 interface PhotoUploadProps {
   onComplete: () => void;
@@ -18,8 +20,6 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({ onComplete }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const API_URL = 'http://localhost:4000'; // Endereço do nosso servidor Fastify local
 
   const handleFiles = (files: FileList) => {
     const newPhotos: PhotoFileItem[] = [];
@@ -75,41 +75,36 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({ onComplete }) => {
     setIsUploading(true);
     setUploadError('');
 
-    const token = localStorage.getItem('sweet_token');
-    if (!token) {
-      setUploadError('Sessão não encontrada. Por favor, realize o login novamente.');
-      setIsUploading(false);
-      return;
-    }
-
     try {
       // Faz o upload sequencial das imagens mantendo a ordem (a primeira será a primária automaticamente)
-      for (const item of photos) {
+      for (let i = 0; i < photos.length; i++) {
+        const item = photos[i];
         const formData = new FormData();
         formData.append('file', item.file);
 
-        const response = await fetch(`${API_URL}/photos/upload`, {
-          method: 'POST',
+        const response = await api.post('/photos/upload', formData, {
           headers: {
-            'Authorization': `Bearer ${token}`
+            'Content-Type': 'multipart/form-data',
           },
-          body: formData
         });
 
-        if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.message || 'Falha ao enviar uma das fotos.');
+        // Se for a primeira foto enviada (index 0), marca ela como primary via API
+        if (i === 0 && response.data?.photo?.id) {
+           await api.put(`/photos/${response.data.photo.id}/primary`);
         }
       }
 
       // Limpa as URLs de objeto da memória após sucesso total
       photos.forEach(item => URL.revokeObjectURL(item.previewUrl));
       
+      toast.success('Fotos enviadas com sucesso!');
       // Prossegue no fluxo visual do Frontend
       onComplete();
     } catch (error: any) {
       console.error('Erro no upload de mídias:', error);
-      setUploadError(error.message || 'Erro de conexão ao enviar as fotos para o servidor local.');
+      const msg = error.response?.data?.message || 'Erro de conexão ao enviar as fotos para o servidor local.';
+      setUploadError(msg);
+      toast.error(msg);
     } finally {
       setIsUploading(false);
     }
