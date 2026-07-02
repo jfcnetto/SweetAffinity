@@ -1,0 +1,27 @@
+# Walkthrough: Fase 06 (Filtros Avançados e Busca)
+
+A Fase 06 foi concluída com sucesso. Agora o sistema suporta filtros avançados no Feed!
+
+## Resumo das Modificações
+
+### Banco de Dados (PostgreSQL + Drizzle)
+- Adicionadas as colunas `latitude` e `longitude` do tipo `double precision` na tabela `profiles` para permitir o cálculo exato de distância.
+- Adicionada a coluna `interests` como um array JSONB em `profiles` para armazenar as tags de estilo de vida de cada usuário.
+- O arquivo `drizzle.config.json` foi renomeado para `.ts` e ajustado para carregar as variáveis de ambiente e não ter problemas de resolução DNS do banco de dados na hora das migrações.
+
+### Backend (Node.js + Fastify)
+- A rota `GET /api/feed` no `MatchController.ts` foi expandida.
+- **Filtro de Idade:** Foi implementado usando a função nativa do PostgreSQL `extract(year from age())`.
+- **Filtro de Distância (Raio):** Foi implementada a [Fórmula de Haversine](https://pt.wikipedia.org/wiki/F%C3%B3rmula_de_Haversine) de forma nativa na query SQL do Drizzle para encontrar perfis até `X` quilômetros da localização (Lat/Lng) do usuário atual!
+- **Filtro de Interesses:** Implementado o operador `?|` de array do JSONB no Postgres para achar sobreposição de interesses.
+
+### Frontend (React)
+- O componente [FeedPage.tsx](file:///c:/SweetAffinity.com/packages/frontend/src/components/FeedPage.tsx) foi atualizado para conter um novo botão flutuante **"Filtros Avançados"**.
+- Criamos um Modal de Filtros para capturar Idade (Min/Max), Distância (Raio) e Interesses (separados por vírgula).
+- O [match.service.ts](file:///c:/SweetAffinity.com/packages/frontend/src/services/match.service.ts) foi atualizado para serializar esses novos campos como *Query Parameters* na requisição da API de Feed.
+
+## Testes Realizados
+- Os componentes React compilam com sucesso no TypeScript sem erros de sintaxe (o erro com `loading` foi removido).
+- Os filtros agora repassam as informações do front pro backend e o motor de matching monta a Query SQL dinamicamente considerando a localização do usuário que está logado.
+
+🎉 **Você já pode proceder para as próximas fases ou testar essa busca!**

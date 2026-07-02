@@ -7,15 +7,17 @@ export default function FeedPage() {
   const [profiles, setProfiles] = useState<FeedProfile[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState<{ minAge?: number, maxAge?: number, radius?: number, interests?: string }>({});
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
-    loadFeed();
-  }, []);
+    loadFeed(filters);
+  }, [filters]);
 
-  const loadFeed = async () => {
+  const loadFeed = async (currentFilters: any) => {
     try {
       setLoading(true);
-      const data = await MatchService.getFeed();
+      const data = await MatchService.getFeed(currentFilters);
       setProfiles(data);
       setCurrentIndex(0);
     } catch (error) {
@@ -43,15 +45,67 @@ export default function FeedPage() {
     }
   };
 
+  const applyFilters = (e: React.FormEvent) => {
+    e.preventDefault();
+    const fd = new FormData(e.target as HTMLFormElement);
+    const newFilters: any = {};
+    const minAge = fd.get('minAge');
+    if (minAge) newFilters.minAge = Number(minAge);
+    const maxAge = fd.get('maxAge');
+    if (maxAge) newFilters.maxAge = Number(maxAge);
+    const radius = fd.get('radius');
+    if (radius) newFilters.radius = Number(radius);
+    const interests = fd.get('interests');
+    if (interests) newFilters.interests = String(interests);
+    
+    setFilters(newFilters);
+    setShowFilters(false);
+  };
+
   if (loading) {
     return <div className="flex justify-center items-center h-64"><p className="text-gray-500">Buscando perfis compatíveis...</p></div>;
   }
 
+  const renderFilterModal = () => {
+    if (!showFilters) return null;
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
+         <div className="bg-white rounded-lg p-6 max-w-sm w-full relative">
+            <button onClick={() => setShowFilters(false)} className="absolute top-4 right-4 text-gray-500 hover:text-black">
+              <X size={24} />
+            </button>
+            <h3 className="text-xl font-bold mb-4 text-gray-800">Filtros de Busca</h3>
+            <form onSubmit={applyFilters} className="space-y-4">
+               <div>
+                 <label className="block text-sm text-gray-600 mb-1">Idade Mínima</label>
+                 <input type="number" name="minAge" defaultValue={filters.minAge} className="w-full border rounded-md p-2" min={18} max={99} />
+               </div>
+               <div>
+                 <label className="block text-sm text-gray-600 mb-1">Idade Máxima</label>
+                 <input type="number" name="maxAge" defaultValue={filters.maxAge} className="w-full border rounded-md p-2" min={18} max={99} />
+               </div>
+               <div>
+                 <label className="block text-sm text-gray-600 mb-1">Raio de Distância (Km)</label>
+                 <input type="number" name="radius" defaultValue={filters.radius} className="w-full border rounded-md p-2" min={1} max={1000} />
+               </div>
+               <div>
+                 <label className="block text-sm text-gray-600 mb-1">Interesses (separados por vírgula)</label>
+                 <input type="text" name="interests" defaultValue={filters.interests} className="w-full border rounded-md p-2" placeholder="Ex: Viagens, Vinhos" />
+               </div>
+               <button type="submit" className="w-full bg-gradient-to-r from-gradient-pink to-gradient-orange text-white py-2 rounded-md font-bold hover:opacity-90">
+                 Aplicar Filtros
+               </button>
+            </form>
+         </div>
+      </div>
+    );
+  };
+
   if (currentIndex >= profiles.length) {
     return (
-      <div className="flex flex-col items-center justify-center h-64">
+      <div className="flex flex-col items-center justify-center h-64 relative">
         <h3 className="text-2xl font-display text-gray-800 mb-4">Você viu todos por hoje!</h3>
-        <button onClick={loadFeed} className="px-6 py-2 bg-gradient-to-r from-gradient-pink to-gradient-orange text-white rounded-full font-semibold">
+        <button onClick={() => loadFeed(filters)} className="px-6 py-2 bg-gradient-to-r from-gradient-pink to-gradient-orange text-white rounded-full font-semibold">
           Atualizar Feed
         </button>
       </div>
@@ -61,7 +115,15 @@ export default function FeedPage() {
   const currentProfile = profiles[currentIndex];
 
   return (
-    <div className="max-w-md mx-auto relative bg-white rounded-2xl shadow-xl overflow-hidden mt-10 border border-gray-100">
+    <div className="max-w-md mx-auto relative mt-10">
+      <div className="flex justify-end mb-4">
+        <button onClick={() => setShowFilters(true)} className="px-4 py-2 bg-white text-gray-700 rounded-full text-sm font-semibold hover:bg-gray-50 shadow border border-gray-200">
+           Filtros Avançados
+        </button>
+      </div>
+      {renderFilterModal()}
+      
+      <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
       <div className="h-96 bg-gray-200 relative">
         {/* Placeholder para a foto principal, assumindo que existiria uma URL ou mock no futuro */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex flex-col justify-end p-6">
@@ -93,6 +155,7 @@ export default function FeedPage() {
           >
             <Heart size={32} />
           </button>
+        </div>
         </div>
       </div>
     </div>

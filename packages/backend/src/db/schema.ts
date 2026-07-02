@@ -9,6 +9,8 @@ import {
   pgEnum,
   index,
   uniqueIndex,
+  doublePrecision,
+  jsonb,
 } from "drizzle-orm/pg-core";
 
 // =====================================================
@@ -158,6 +160,10 @@ export const profiles = pgTable(
     profession: text("profession"),
     education: text("education"),
     incomeRange: text("income_range"), // Obrigatório para Daddy/Mommy (RN-004) — validado no controller
+
+    latitude: doublePrecision("latitude"),
+    longitude: doublePrecision("longitude"),
+    interests: jsonb("interests").$type<string[]>(),
 
     maritalStatus: maritalStatusEnum("marital_status"),
 

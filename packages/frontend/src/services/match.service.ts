@@ -27,8 +27,15 @@ export interface MatchListProfile {
 }
 
 export class MatchService {
-  static async getFeed(): Promise<FeedProfile[]> {
-    const res = await api.get("/feed");
+  static async getFeed(filters?: { minAge?: number, maxAge?: number, radius?: number, interests?: string }): Promise<FeedProfile[]> {
+    const params = new URLSearchParams();
+    if (filters) {
+      if (filters.minAge) params.append('minAge', filters.minAge.toString());
+      if (filters.maxAge) params.append('maxAge', filters.maxAge.toString());
+      if (filters.radius) params.append('radius', filters.radius.toString());
+      if (filters.interests) params.append('interests', filters.interests);
+    }
+    const res = await api.get(`/feed?${params.toString()}`);
     return res.data;
   }
 

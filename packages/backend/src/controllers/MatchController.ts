@@ -19,6 +19,13 @@ export async function matchRoutes(app: FastifyInstance) {
   app.get("/api/feed", async (req: any, reply: FastifyReply) => {
     try {
       const userId = req.user.sub;
+      
+      const { minAge, maxAge, radius, interests } = req.query as {
+        minAge?: string;
+        maxAge?: string;
+        radius?: string; // in km
+        interests?: string; // comma separated
+      };
 
       // 1. Pega os dados do usuário atual (pra saber o que ele busca)
       const currentUser = await db.query.profiles.findFirst({
@@ -47,6 +54,48 @@ export async function matchRoutes(app: FastifyInstance) {
       const swipedIds = pastSwipes.map((s) => s.toUserId);
       swipedIds.push(userId); // Adiciona o próprio usuário pra não curtir a si mesmo
 
+      // Build filters dynamically
+      import { sql } from 'drizzle-orm';
+      
+      const conditions = [
+        eq(users.status, "active"),
+        notInArray(profiles.id, swipedIds),
+        inArray(profiles.relationshipType, targetRelationships)
+      ];
+
+      // Age filter
+      if (minAge) {
+        conditions.push(sql`extract(year from age(current_date, ${profiles.birthDate})) >= ${Number(minAge)}`);
+      }
+      if (maxAge) {
+        conditions.push(sql`extract(year from age(current_date, ${profiles.birthDate})) <= ${Number(maxAge)}`);
+      }
+
+      // Location filter (Haversine)
+      if (radius && currentUser.latitude && currentUser.longitude) {
+        const rad = Number(radius);
+        const lat = currentUser.latitude;
+        const lng = currentUser.longitude;
+        
+        // 6371 is Earth's radius in km
+        conditions.push(sql`
+          (6371 * acos(
+            cos(radians(${lat})) * cos(radians(${profiles.latitude})) *
+            cos(radians(${profiles.longitude}) - radians(${lng})) +
+            sin(radians(${lat})) * sin(radians(${profiles.latitude}))
+          )) <= ${rad}
+        `);
+      }
+
+      // Interests filter (JSONB intersects)
+      if (interests) {
+        const interestArray = interests.split(',').map(i => i.trim());
+        if (interestArray.length > 0) {
+           // We use the JSONB ?| operator to check if any of the array elements exist in the interests jsonb array
+           conditions.push(sql`${profiles.interests} ?| array[${sql.join(interestArray.map(i => sql`${i}`), sql`, `)}]`);
+        }
+      }
+
       // 3. Busca os recomendados!
       const feedProfiles = await db
         .select({
@@ -58,16 +107,11 @@ export async function matchRoutes(app: FastifyInstance) {
           bio: profiles.bio,
           relationshipType: profiles.relationshipType,
           popularityScore: profiles.popularityScore,
+          interests: profiles.interests,
         })
         .from(profiles)
         .leftJoin(users, eq(users.id, profiles.id))
-        .where(
-          and(
-            eq(users.status, "active"),
-            notInArray(profiles.id, swipedIds),
-            inArray(profiles.relationshipType, targetRelationships)
-          )
-        )
+        .where(and(...conditions))
         .limit(20);
         
       // Ordena por popularidade (descendente)

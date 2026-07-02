@@ -1,0 +1,40 @@
+# Plano de Implementação: Fase 06 (Filtros Avançados e Busca)
+
+A Fase 06 visa enriquecer a experiência do Matchmaking (Feed) permitindo que os usuários filtrem suas recomendações com base em preferências específicas, em vez de ver todos os perfis compatíveis aleatoriamente.
+
+## User Review Required
+> [!IMPORTANT]
+> **Definição de Localização (Raio em Km vs. Estado/Cidade):**
+> O nosso banco de dados atual armazena `state` e `city`, mas não armazena coordenadas de Latitude e Longitude (GPS). Para implementarmos a busca por *Raio em Km* (como manda o documento original), precisaríamos adicionar lat/lng no banco e consultar a API do Google Maps / ViaCEP no momento do cadastro.
+> **Pergunta:** Deseja que eu adicione lat/lng no banco de dados e faça a busca por Raio (matemática PostGIS/Haversine) ou prefere um filtro exato mais simples por "Estado e Cidade"?
+
+## Mudanças Propostas
+
+### Banco de Dados (Drizzle Schema)
+
+#### [MODIFY] `packages/backend/src/db/schema.ts`
+- Adicionar a coluna `interests: text("interests").array()` na tabela `profiles` para armazenar as Tags de estilo de vida/interesses (ex: `["Viagens", "Vinhos", "Luxo"]`).
+- Gerar e rodar a migration para atualizar o PostgreSQL.
+
+### Backend (Node.js / Fastify)
+
+#### [MODIFY] `packages/backend/src/controllers/MatchController.ts`
+- Atualizar a rota `GET /api/feed` para aceitar parâmetros de *Query String* (ex: `?minAge=18&maxAge=30&state=SP&interests=Vinhos`).
+- **Filtro de Idade:** Utilizar a coluna `birthDate` e calcular a diferença de anos usando SQL (`age()` ou `extract(year from age())`).
+- **Filtro de Localização:** Adicionar clausula `where` condicional para `state` e `city`.
+- **Filtro de Interesses:** Adicionar filtro usando o operador de array do Postgres para encontrar perfis que contenham as tags enviadas.
+
+### Frontend (React)
+
+#### [MODIFY] `packages/frontend/src/components/FeedPage.tsx`
+- Adicionar um botão "Filtros" que abre um modal ou painel lateral (Drawer).
+- Criar o formulário de filtros (Idade Mín/Máx, Estado, Cidade, Interesses).
+- Ao aplicar os filtros, repassar os valores como Query Params na chamada `MatchService.getFeed(filters)`.
+
+#### [MODIFY] `packages/frontend/src/services/match.service.ts`
+- Atualizar a interface do `getFeed()` para aceitar e montar os query parameters na requisição Axios.
+
+## Verification Plan
+1. Atualizaremos o nosso perfil simulado e de alguns testes com idades e cidades variadas.
+2. Abriremos o Feed na interface web e testaremos o filtro de "Apenas maiores de 30 anos" ou "Apenas do estado SP".
+3. Validaremos se o backend retorna estritamente os perfis que batem com as restrições informadas.
