@@ -1,0 +1,43 @@
+# Especificação Técnica e Plano de Implementação (Backoffice & Dashboard Financeiro)
+
+## Resumo Funcional
+Esta fase focará no **Backoffice Administrativo**, permitindo que moderadores e administradores gerenciem a plataforma. Teremos:
+1. **Fila de Moderação:** Visualização de fotos pendentes de aprovação e bloqueio de usuários.
+2. **Dashboard de KPIs Financeiros:** Acompanhamento de MRR (Receita Recorrente Mensal), Churn, ARR e total de usuários Premium em tempo real.
+3. **Auditoria (Audit Log):** Rastreio das ações feitas pelos moderadores no painel (quem aprovou qual foto, quem baniu qual usuário).
+
+## User Review Required
+> [!IMPORTANT]
+> **Modelo Financeiro:** Atualmente, a tabela `users` possui apenas a flag `isPremium`. Para calcular métricas reais como Churn e MRR com precisão histórica, precisaremos criar uma tabela `payments` ou `subscriptions` no PostgreSQL, ou podemos usar um cálculo estimado (Total de Premium * Preço do Plano).
+> **Pergunta 1:** Devemos criar a tabela de histórico de assinaturas (`subscriptions`) para alimentar as métricas do painel, ou prefere mockar os dados de faturamento baseando-se apenas nos usuários premium atuais?
+> **Pergunta 2:** Deseja que a página administrativa seja no mesmo projeto React (em uma rota `/admin`) protegida por autenticação, ou prefere que seja um projeto separado? O plano abaixo assume a mesma base de código React, usando proteção de rota.
+
+## Mudanças Propostas
+
+### 1. Banco de Dados (`schema.ts`)
+#### [MODIFY] `packages/backend/src/db/schema.ts`
+- Adicionar tabela `audit_logs` para registrar quem fez o quê (ex: moderador X aprovou foto Y).
+- (Opcional, aguardando aprovação) Adicionar tabela `subscriptions` ou `payments` para o histórico de faturamento.
+
+### 2. Backend Administrativo (Fastify)
+#### [MODIFY] `packages/backend/src/controllers/AdminController.ts`
+- Modificar o middleware para verificar o token JWT e barrar requisições que não possuam `profileType === 'admin'`.
+- `GET /api/admin/dashboard` - Retornar estatísticas financeiras (MRR, Churn) e métricas gerais (usuários totais, matches recentes).
+- `GET /api/admin/moderation/photos` - Listar fila de fotos pendentes (`status = 'pending'`).
+- `POST /api/admin/moderation/photos/:id` - Aprovar ou Rejeitar fotos (já tem parte implementada, mas vamos registrar no Audit Log).
+- `POST /api/admin/users/:id/ban` - Banir usuários infratores e gerar Log de Auditoria.
+
+### 3. Frontend de Administração (React)
+#### [NEW] `packages/frontend/src/components/admin/Dashboard.tsx`
+- Layout isolado contendo gráficos (usando Recharts ou HTML5/CSS) para MRR, Churn, LTV, e ARR.
+#### [NEW] `packages/frontend/src/components/admin/ModerationQueue.tsx`
+- Fila visual estilo "Tinder de Aprovação" para o administrador dizer Sim/Não para documentos e fotos (Selfie/RG).
+#### [MODIFY] `packages/frontend/src/components/admin/AdminPage.tsx`
+- Refatorar a página estática de Admin para usar requisições reais ao `AdminService.ts`.
+- Adicionar sidebar de navegação interna do admin.
+
+## Verification Plan (Plano de Testes - QA)
+- **Cenário 1 (Acesso Indevido):** Tentar acessar `/admin` com uma conta `user` comum. Esperado: Redirecionamento para a Home (Proteção de Rota) e API retornando 403 Forbidden.
+- **Cenário 2 (Dashboard Financeiro):** Cadastrar 3 contas premium, acessar o painel admin e validar se o MRR saltou para 3x o valor do plano.
+- **Cenário 3 (Fila de Moderação):** Como usuário comum, enviar uma foto. Como admin, acessar a fila e rejeitar a foto. Validar se a foto sumiu do app do usuário e se o banco de dados deletou o arquivo físico no MinIO.
+- **Cenário 4 (Auditoria):** Verificar se o banco registrou "O Admin ID X deletou a foto Y do Usuário Z" na tabela `audit_logs`.

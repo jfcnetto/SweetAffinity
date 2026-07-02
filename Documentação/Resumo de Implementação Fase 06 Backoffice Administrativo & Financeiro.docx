@@ -1,0 +1,25 @@
+# Resumo de Implementação: Fase 06 (Backoffice Administrativo & Financeiro)
+
+## O que foi implementado
+
+O painel administrativo da Sweet Affinity foi integrado com dados reais provenientes do backend, substituindo os dados mockados anteriores e habilitando um ambiente de backoffice completo com suporte a moderação e KPIs financeiros.
+
+### Banco de Dados
+- **Tabela `audit_logs`:** Implementada para registrar todas as ações críticas feitas pelos administradores (ex: banimentos de usuários, aprovação/rejeição de fotos).
+- **Tabela `subscriptions`:** Adicionada para registrar o histórico financeiro vindo do Stripe (MRR, planos, vencimentos).
+- Migrações aplicadas manualmente para o PostgreSQL.
+
+### Backend (Fastify)
+- **Middleware de Autenticação Segura:** A rota `/api/admin/*` agora valida via JWT e rejeita qualquer usuário que não possua a flag `profileType === 'admin'`.
+- **Moderação com Auditoria:** As rotas de mudar o status do usuário (`PUT /users/:id/status`) e moderar foto (`PUT /photos/:id/approval`) inserem os dados em `audit_logs`.
+- **Dashboard Financeiro:** Criada rota `GET /api/admin/dashboard` realizando cálculos diretos via SQL para retornar a soma das assinaturas ativas (MRR, ARR) e contagem total de usuários ativos.
+
+### Frontend (React)
+- **Rotas e Navegação Privada:** O botão de "Backoffice" na barra superior agora só é exibido se o usuário for administrador (`profileType === 'admin'`). O clique altera a view isolando o app para a área administrativa.
+- **Painel em Abas (AdminPage):**
+  - **Dashboard:** Renderiza gráficos usando o pacote `recharts` exibindo métricas de crescimento.
+  - **Moderação de Fotos:** Nova interface para aprovação rápida de documentos e selfies, exibindo em um grid.
+  - **Usuários:** Lista completa de contas registradas, com possibilidade de Alterar Status de "Ativo" para "Suspenso" ou "Banido", refletindo imediatamente no backend.
+
+## Próximos Passos
+Tudo pronto para a **Fase 07** (Arquitetura de Growth, Next.js e SEO) conforme a especificação do projeto. Aguardo suas instruções para iniciarmos a próxima fase!

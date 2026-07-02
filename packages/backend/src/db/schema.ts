@@ -372,3 +372,72 @@ export const refreshTokens = pgTable(
     tokenIdx: uniqueIndex("refresh_tokens_token_idx").on(table.token),
   })
 );
+
+// =====================================================
+// SUBSCRIPTIONS (Stripe History)
+// =====================================================
+
+export const subscriptions = pgTable(
+  "subscriptions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+
+    stripeSubscriptionId: text("stripe_subscription_id").notNull(),
+    stripeCustomerId: text("stripe_customer_id").notNull(),
+    
+    status: subscriptionStatusEnum("status").notNull(),
+    planId: text("plan_id").notNull(),
+    
+    amount: integer("amount").notNull(), // Amount in cents
+
+    currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }).notNull(),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => ({
+    userIdx: index("subscriptions_user_idx").on(table.userId),
+    stripeSubIdx: uniqueIndex("subscriptions_stripe_sub_idx").on(table.stripeSubscriptionId),
+    statusIdx: index("subscriptions_status_idx").on(table.status),
+  })
+);
+
+// =====================================================
+// AUDIT LOGS
+// =====================================================
+
+export const auditLogs = pgTable(
+  "audit_logs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    adminId: uuid("admin_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "set null" }),
+
+    action: text("action").notNull(), // ex: "approve_photo", "ban_user"
+    
+    entity: text("entity").notNull(), // ex: "photo", "user"
+    entityId: text("entity_id").notNull(), // string para suportar UUIDs ou IDs numéricos genéricos
+
+    details: jsonb("details"), // Informações extras
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    adminIdx: index("audit_logs_admin_idx").on(table.adminId),
+    entityIdx: index("audit_logs_entity_idx").on(table.entity, table.entityId),
+  })
+);

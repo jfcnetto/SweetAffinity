@@ -102,6 +102,17 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
         });
       }
 
+      // Adicionando Log de Auditoria
+      const userObj = request.user as any;
+      import { auditLogs } from "../db/schema.js";
+      await db.insert(auditLogs).values({
+        adminId: userObj.sub,
+        action: `update_user_status_${status}`,
+        entity: "user",
+        entityId: id,
+        details: { previousStatus: "unknown", newStatus: status }
+      });
+
       return reply.send({
         message: `Status atualizado para ${status}`,
         user: result[0],
@@ -165,11 +176,14 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
     const { approved } = request.body as { approved: boolean };
 
     try {
+      const userObj = request.user as any;
+      import { auditLogs } from "../db/schema.js";
+
       if (approved) {
         const result = await db
           .update(photos)
           .set({
-            status: "approved",  // corrigido: era isApproved: true
+            status: "approved",
           })
           .where(eq(photos.id, id))
           .returning();
@@ -179,6 +193,15 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
             message: "Foto não encontrada.",
           });
         }
+
+        // Log de Auditoria
+        await db.insert(auditLogs).values({
+          adminId: userObj.sub,
+          action: "approve_photo",
+          entity: "photo",
+          entityId: id,
+          details: { status: "approved" }
+        });
 
         return reply.send({
           message: "Foto aprovada com sucesso.",
@@ -197,14 +220,63 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
         });
       }
 
+      // Log de Auditoria
+      await db.insert(auditLogs).values({
+        adminId: userObj.sub,
+        action: "reject_photo",
+        entity: "photo",
+        entityId: id,
+        details: { status: "rejected_and_deleted" }
+      });
+
       return reply.send({
-        message:
-          "Foto rejeitada e removida do sistema.",
+        message: "Foto rejeitada e removida do sistema.",
       });
     } catch (error) {
       fastify.log.error(error);
       return reply.status(500).send({
         message: "Erro ao moderar foto.",
+      });
+    }
+  });
+
+  // =====================================================
+  // 5. DASHBOARD FINANCEIRO E KPIS
+  // =====================================================
+
+  fastify.get("/dashboard", async (request, reply) => {
+    try {
+      // 1. Contagem de usuários ativos
+      const usersResult = await db.execute(sql`SELECT count(*) FROM users WHERE status = 'active'`);
+      const totalActiveUsers = usersResult.rows[0].count;
+
+      // 2. Cálculo do MRR (Mensal Recorrente) e Assinaturas Ativas
+      const subsResult = await db.execute(sql`
+        SELECT count(*) as active_subs, sum(amount) as mrr_cents 
+        FROM subscriptions 
+        WHERE status = 'active'
+      `);
+      const activeSubs = subsResult.rows[0].active_subs;
+      const mrr = subsResult.rows[0].mrr_cents ? Number(subsResult.rows[0].mrr_cents) / 100 : 0;
+      
+      // ARR (Annual Recurring Revenue)
+      const arr = mrr * 12;
+
+      // 3. Contagem de Matches (Engajamento)
+      const matchesResult = await db.execute(sql`SELECT count(*) FROM matches`);
+      const totalMatches = matchesResult.rows[0].count;
+
+      return reply.send({
+        totalActiveUsers: Number(totalActiveUsers),
+        activeSubscriptions: Number(activeSubs),
+        mrr,
+        arr,
+        totalMatches: Number(totalMatches)
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.status(500).send({
+        message: "Erro ao gerar KPIs do Dashboard.",
       });
     }
   });

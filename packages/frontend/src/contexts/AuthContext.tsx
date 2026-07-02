@@ -6,6 +6,7 @@ interface UserData {
   sub: string;
   relationshipType: 'baby' | 'daddy' | 'mommy';
   isPremium: boolean;
+  profileType?: string;
   exp: number;
 }
 

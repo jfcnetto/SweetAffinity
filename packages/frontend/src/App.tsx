@@ -11,6 +11,7 @@ import FeedPage from './components/FeedPage.js';
 import MatchesPage from './components/MatchesPage.js';
 import SubscriptionPlans from './components/SubscriptionPlans.js';
 import PaymentModal from './components/PaymentModal.js';
+import AdminPage from './components/admin/AdminPage.js';
 import type { Plan } from './types.js';
 
 const mockPlans: Plan[] = [
@@ -22,19 +23,23 @@ const mockPlans: Plan[] = [
 export default function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [currentView, setCurrentView] = useState<'home' | 'feed' | 'matches' | 'plans'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'feed' | 'matches' | 'plans' | 'admin'>('home');
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   
   const { isAuthenticated, logout, user } = useAuth();
 
-  // Se estiver logado e na home, joga pro feed
+  // Se estiver logado e na home, joga pro feed, ou se tentar admin e for admin
   React.useEffect(() => {
     if (isAuthenticated && currentView === 'home') {
-      setCurrentView('feed');
+      if (user?.profileType === 'admin') {
+        setCurrentView('admin');
+      } else {
+        setCurrentView('feed');
+      }
     } else if (!isAuthenticated) {
       setCurrentView('home');
     }
-  }, [isAuthenticated, currentView]);
+  }, [isAuthenticated, currentView, user]);
 
   const openAuthModal = (mode: 'login' | 'register') => {
     setAuthMode(mode);
@@ -81,6 +86,14 @@ export default function App() {
            >
              ✨ Premium {user?.isPremium && <span className="bg-amber-400 text-white text-xs px-2 py-0.5 rounded-full ml-1">ATIVO</span>}
            </button>
+           {user?.profileType === 'admin' && (
+             <button 
+               onClick={() => setCurrentView('admin')} 
+               className={`font-semibold flex items-center gap-1 ${currentView === 'admin' ? 'text-blue-600 border-b-2 border-blue-600 pb-1' : 'text-gray-500 hover:text-gray-700'}`}
+             >
+               🛡️ Backoffice
+             </button>
+           )}
         </div>
       )}
 
@@ -96,6 +109,7 @@ export default function App() {
         {currentView === 'feed' && <FeedPage />}
         {currentView === 'matches' && <MatchesPage />}
         {currentView === 'plans' && <SubscriptionPlans plans={mockPlans} onSubscribeClick={handleSubscribeClick} />}
+        {currentView === 'admin' && user?.profileType === 'admin' && <AdminPage />}
       </main>
 
       <Footer />
