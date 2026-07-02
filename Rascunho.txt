@@ -1,3 +1,62 @@
 git push
 Get-ChildItem -Recurse -Depth 3 | Select-Object FullName
 npm run dev:backend
+npx drizzle-kit push
+npm run dev -w packages/backend
+
+Desenvolvimento SweetAffinity
+
+continuando na fase 01 vamos para mais um item de desenvolvimento, portanto antes de iniciair desenvolver o codigo elabore a documentação ou seja especificação tecnica e funciona da seguinte  tarefa , sem esquecer do testes desenvolvimendo pensado como um Analista de qualidade. segue nossa tarefa
+
+commit CRUD de Perfis, Integração IBGE, Upload de Fotos (MinIO) e Rate Limiting com Redis
+
+
+CRUD de Perfis, Integração IBGE, Upload de Fotos (MinIO) e Rate Limiting com Redis
+
+
+Perfeito! Vou ler toda a documentação antes de iniciar a análise.Documentação lida. Agora tenho o contexto completo: stack, regras de negócio, boas práticas e estrutura do projeto.
+
+**Vou trabalhar como QA + Dev.** O processo será: recebo os arquivos → analiso → identifico problemas → devolvo corrigidos e completos.
+
+Me passe os arquivos nesta ordem de prioridade (são os de maior risco de bug):Documentação toda lida. Vou direto ao ponto.
+
+---
+
+**Modo ativo: QA Analyst + Developer**
+
+Preciso dos arquivos do código implementado para iniciar a análise. Me passe nesta ordem de prioridade (um ou mais por vez, como preferir):
+
+**Lote 1 — Críticos (maior risco de bug):**
+1. `packages/backend/src/index.ts` — servidor, plugins, registro de rotas
+2. `packages/backend/src/db/schema.ts` — fonte única de verdade do banco
+3. `packages/backend/src/middleware/rateLimiter.ts` — Lua script Redis, sliding window
+
+**Lote 2 — Lógica de negócio:**
+4. `packages/backend/src/controllers/ProfileController.ts`
+5. `packages/backend/src/controllers/PhotoController.ts`
+6. `packages/backend/src/services/ibge.service.ts`
+
+**Lote 3 — Complementares:**
+7. `packages/backend/src/services/ProfileService.ts`
+8. `packages/backend/src/controllers/AdminController.ts`
+9. `packages/backend/src/controllers/MessageController.ts`
+
+Para cada arquivo vou verificar especificamente:
+- **Imports com `.js`** (não `.ts`) — obrigatório conforme boas práticas
+- **Drizzle ORM exclusivo** — sem `pgPool` raw ou SQL solto
+- **Regras de negócio** RN-001 a RN-018 implementadas corretamente
+- **Separação controller → service** — lógica não pode estar no controller
+- **try/catch** em todas as rotas críticas
+- **Headers de rate limit** (`X-RateLimit-*`, `Retry-After`)
+- **Pipeline de upload** — 11 etapas da spec, incluindo path traversal
+- **Fallback Redis** no IBGE
+
+Pode colar o conteúdo dos arquivos diretamente no chat ou fazer upload. Qual lote começa?
+
+
+
+
+
+
+
+

@@ -1,11 +1,11 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import multipart from "@fastify/multipart";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { randomUUID } from "crypto";
 
 import { db } from "../db/index.js";
 import { photos } from "../db/schema.js";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 // =====================================================
 // CONFIG S3 / MINIO
@@ -157,7 +157,43 @@ export const photoRoutes = async (fastify: FastifyInstance) => {
   );
 
   // =====================================================
-  // DELETE PHOTO
+  // GET USER PHOTOS BY ID (RN-018: Filtro Premium)
+  // =====================================================
+
+  fastify.get(
+    "/user/:userId",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        await request.jwtVerify();
+        const { userId } = request.params as { userId: string };
+        const viewer = request.user as { id: string; isPremium?: boolean };
+
+        const userPhotos = await db
+          .select()
+          .from(photos)
+          .where(eq(photos.userId, userId));
+
+        // Aplica filtro de visibilidade privada (RN-018)
+        const visiblePhotos = userPhotos.filter((photo) => {
+          if (photo.isPrivate && !viewer.isPremium) return false;
+          return true;
+        });
+
+        return reply.send(
+          visiblePhotos.map((p) => ({
+            ...p,
+            url: `${MINIO_URL}/${p.storagePath}`,
+          }))
+        );
+      } catch (error) {
+        fastify.log.error(error);
+        return reply.status(500).send({ message: "Erro ao buscar fotos do usuário." });
+      }
+    }
+  );
+
+  // =====================================================
+  // DELETE PHOTO (RN-017: Transacional com MinIO)
   // =====================================================
 
   fastify.delete(
@@ -170,27 +206,28 @@ export const photoRoutes = async (fastify: FastifyInstance) => {
 
         const { id } = request.params as { id: string };
 
-        const deleted = await db
-          .delete(photos)
-          .where(eq(photos.id, id))
-          .returning();
+        // Busca a foto para obter o path
+        const [photo] = await db
+          .select()
+          .from(photos)
+          .where(and(eq(photos.id, id), eq(photos.userId, user.id)));
 
-        if (!deleted.length) {
+        if (!photo) {
           return reply.status(404).send({
             message: "Foto não encontrada.",
           });
         }
 
-        return reply.send({
-          message: "Foto removida com sucesso.",
-        });
-      } catch (error) {
-        fastify.log.error(error);
+        // Remove do MinIO
+        await s3Client.send(
+          new DeleteObjectCommand({
+            Bucket: BUCKET_NAME,
+            Key: photo.storagePath,
+          })
+        );
 
-        return reply.status(500).send({
-          message: "Erro ao deletar foto.",
-        });
-      }
-    }
-  );
-};
+        // Remove do Banco
+        const deleted = await db
+          .delete(photos)
+          .where(eq(photos.id, id))
+          .returning();

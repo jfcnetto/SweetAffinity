@@ -5,6 +5,7 @@ import {
   boolean,
   timestamp,
   date,
+  integer,
   pgEnum,
   index,
   uniqueIndex,
@@ -34,6 +35,8 @@ export const genderEnum = pgEnum("gender", [
   "other",
 ]);
 
+// ✅ CORRIGIDO: profileType em users conforme Boas Práticas
+// ("profileType → segurança do sistema — não deve ser regra de negócio do perfil")
 export const profileTypeEnum = pgEnum("profile_type", [
   "baby",
   "daddy",
@@ -65,6 +68,12 @@ export const photoStatusEnum = pgEnum("photo_status", [
   "rejected",
 ]);
 
+export const photoTypeEnum = pgEnum("photo_type", [
+  "profile",
+  "validation",
+  "background",
+]);
+
 export const messageStatusEnum = pgEnum("message_status", [
   "sent",
   "delivered",
@@ -93,6 +102,11 @@ export const users = pgTable(
     role: userRoleEnum("role").notNull().default("user"),
     status: userStatusEnum("status").notNull().default("pending"),
 
+    // ✅ CORRIGIDO: profileType movido de profiles → users
+    // Boas Práticas: "profileType → segurança do sistema"
+    // Define o tipo do usuário no momento do cadastro (imutável via RN-003)
+    profileType: profileTypeEnum("profile_type"),
+
     isVerified: boolean("is_verified").notNull().default(false),
     isPremium: boolean("is_premium").notNull().default(false),
 
@@ -108,6 +122,7 @@ export const users = pgTable(
   (table) => ({
     emailIdx: uniqueIndex("users_email_idx").on(table.email),
     statusIdx: index("users_status_idx").on(table.status),
+    profileTypeIdx: index("users_profile_type_idx").on(table.profileType),
   })
 );
 
@@ -118,15 +133,20 @@ export const users = pgTable(
 export const profiles = pgTable(
   "profiles",
   {
+    // FK para users — 1 usuário : 1 perfil (RN-001)
     id: uuid("id")
       .primaryKey()
       .references(() => users.id, { onDelete: "cascade" }),
 
-    displayName: text("display_name"),
-    birthDate: date("birth_date"),
+    // ✅ CORRIGIDO: .notNull() pois displayName é obrigatório na criação (spec 3.1.3)
+    displayName: text("display_name").notNull(),
+
+    // ✅ CORRIGIDO: .notNull() pois birthDate é obrigatório + validação de 18 anos (RN-002)
+    birthDate: date("birth_date").notNull(),
 
     gender: genderEnum("gender"),
-    profileType: profileTypeEnum("profile_type"),
+
+    // ✅ REMOVIDO: profileType saiu daqui → foi para users (Boas Práticas)
 
     state: text("state"),
     city: text("city"),
@@ -134,7 +154,7 @@ export const profiles = pgTable(
     bio: text("bio"),
     profession: text("profession"),
     education: text("education"),
-    incomeRange: text("income_range"),
+    incomeRange: text("income_range"), // Obrigatório para Daddy/Mommy (RN-004) — validado no controller
 
     maritalStatus: maritalStatusEnum("marital_status"),
 
@@ -145,6 +165,15 @@ export const profiles = pgTable(
 
     smoking: smokingEnum("smoking"),
     drinking: drinkingEnum("drinking"),
+
+    seekingDescription: text("seeking_description"), // ✅ ADICIONADO — spec 3.1.3
+
+    // ✅ ADICIONADOS: campos de engajamento somente leitura (RN-005)
+    popularityScore: integer("popularity_score").notNull().default(0),
+    profileViews: integer("profile_views").notNull().default(0),
+
+    // ✅ ADICIONADO: soft delete (CA-P08 — DELETE realiza exclusão lógica)
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
 
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -159,6 +188,9 @@ export const profiles = pgTable(
     cityIdx: index("profiles_city_idx").on(table.city),
     stateIdx: index("profiles_state_idx").on(table.state),
     genderIdx: index("profiles_gender_idx").on(table.gender),
+    // ✅ ADICIONADO: índice para ordenação de listagem (spec 3.1.4 sort params)
+    popularityIdx: index("profiles_popularity_idx").on(table.popularityScore),
+    deletedAtIdx: index("profiles_deleted_at_idx").on(table.deletedAt),
   })
 );
 
@@ -175,12 +207,27 @@ export const photos = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
 
-    url: text("url").notNull(),
-    thumbnailUrl: text("thumbnail_url"),
+    // ✅ CORRIGIDO: storagePath em vez de url
+    // Spec 3.3.3 passo 6: "users/{userId}/photos/{uuid}-original.{ext}"
+    // A API serve a URL — o banco guarda apenas o path interno do MinIO
+    storagePath: text("storage_path").notNull(),
 
-    isPrimary: boolean("is_primary").default(false),
+    // ✅ CORRIGIDO: thumbnailPath em vez de thumbnailUrl (mesmo princípio)
+    thumbnailPath: text("thumbnail_path"),
 
-    status: photoStatusEnum("status").default("pending"),
+    isPrimary: boolean("is_primary").notNull().default(false),
+
+    // status (pending/approved/rejected) cobre o is_approved da spec
+    // Mais expressivo que um boolean simples
+    status: photoStatusEnum("status").notNull().default("pending"),
+
+    type: photoTypeEnum("type").notNull().default("profile"),
+
+    // ✅ ADICIONADO: isPrivate — visibilidade premium (RN-018)
+    isPrivate: boolean("is_private").notNull().default(false),
+
+    // ✅ ADICIONADO: sortOrder — permite reordenação pelo usuário
+    sortOrder: integer("sort_order").notNull().default(0),
 
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -188,6 +235,9 @@ export const photos = pgTable(
   },
   (table) => ({
     userIdx: index("photos_user_idx").on(table.userId),
+    typeIdx: index("photos_type_idx").on(table.type),
+    // ✅ ADICIONADO: índice para filtro de fotos privadas (RN-018)
+    privateIdx: index("photos_private_idx").on(table.isPrivate),
   })
 );
 
@@ -210,7 +260,7 @@ export const messages = pgTable(
 
     content: text("content").notNull(),
 
-    status: messageStatusEnum("status").default("sent"),
+    status: messageStatusEnum("status").notNull().default("sent"),
 
     readAt: timestamp("read_at", { withTimezone: true }),
 
@@ -283,7 +333,7 @@ export const likes = pgTable(
 );
 
 // =====================================================
-// REFRESH TOKENS (JWT B + SEGURANÇA)
+// REFRESH TOKENS
 // =====================================================
 
 export const refreshTokens = pgTable(

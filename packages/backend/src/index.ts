@@ -2,7 +2,7 @@ import "./env.js";
 
 import Fastify from "fastify";
 import cors from "@fastify/cors";
-import rateLimit from "@fastify/rate-limit";
+import multipart from "@fastify/multipart";
 import { Server } from "socket.io";
 
 // DB
@@ -11,10 +11,14 @@ import { testDatabase } from "./db/index.js";
 // Plugins
 import jwtPlugin from "./plugins/jwt.js";
 
+// Rate Limiter — plugin centralizado com sliding window por endpoint
+import { setupRateLimiter } from "./middleware/rateLimiter.js";
+
 // Routes
 import { authRoutes } from "./modules/auth/auth.controller.js";
 import { photoRoutes } from "./controllers/PhotoController.js";
 import { profileRoutes } from "./controllers/ProfileController.js";
+import { ibgeRoutes } from "./controllers/IbgeController.js"; // ✅ ADICIONADO
 import {
   messageRoutes,
   initChatSocket,
@@ -36,6 +40,8 @@ const server = Fastify({
       },
     },
   },
+  // Necessário para que request.ip retorne o IP real vindo do Nginx
+  trustProxy: true,
 });
 
 // =====================================================
@@ -60,7 +66,7 @@ async function start() {
     server.log.info("✅ Banco conectado");
 
     // =====================================================
-    // PLUGINS (ordem obrigatória: cors → rateLimit → jwt)
+    // PLUGINS (ordem obrigatória: cors → rateLimit → multipart → jwt)
     // =====================================================
 
     await server.register(cors, {
@@ -68,28 +74,26 @@ async function start() {
       credentials: true,
     });
 
-    await server.register(rateLimit, {
-      max: 100,
-      timeWindow: "1 minute",
-      errorResponseBuilder: () => ({
-        statusCode: 429,
-        error: "Too Many Requests",
-        message: "Muitas requisições vindas deste IP.",
-      }),
+    // ✅ CORRIGIDO: Rate Limiting centralizado via setupRateLimiter
+    // Implementa sliding window com Lua e limites por endpoint
+    // O index.ts NÃO registra @fastify/rate-limit diretamente — evita duplo registro
+    await setupRateLimiter(server);
+
+    // Multipart — necessário para upload de fotos
+    await server.register(multipart, {
+      limits: {
+        fileSize: 10 * 1024 * 1024, // 10 MB — conforme RN-015
+      },
     });
 
     await server.register(jwtPlugin);
 
     // =====================================================
     // ROUTES
-    // FIX: prefix aqui + rotas relativas dentro do controller
-    // Exemplo: prefix "/auth" + rota "/register" = GET /auth/register
     // =====================================================
 
-    await server.register(authRoutes);      // FIX: sem prefix — o auth.controller.ts
-                                            // já define as rotas como /auth/register etc.
-                                            // OU, se preferir prefixo aqui, remova o
-                                            // "/auth" de dentro do auth.controller.ts
+    // Auth — as rotas internas devem registrar o prefixo /auth
+    await server.register(authRoutes);
 
     await server.register(profileRoutes, {
       prefix: "/profiles",
@@ -97,6 +101,11 @@ async function start() {
 
     await server.register(photoRoutes, {
       prefix: "/photos",
+    });
+
+    // ✅ ADICIONADO: rotas IBGE (proxy com cache Redis)
+    await server.register(ibgeRoutes, {
+      prefix: "/ibge",
     });
 
     await server.register(messageRoutes, {

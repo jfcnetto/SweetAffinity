@@ -67,4 +67,46 @@ export const profileRoutes = async (fastify: FastifyInstance) => {
       }
     }
   );
+
+  // =====================================================
+  // UPDATE PROFILE (RN-007: Autorização de edição)
+  // =====================================================
+
+  fastify.put(
+    "/:id",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        await request.jwtVerify();
+        const user = request.user as { id: string };
+        const { id: targetId } = request.params as { id: string };
+
+        // Validação de segurança: apenas o dono pode editar (RN-007)
+        if (targetId !== user.id) {
+          return reply.status(403).send({ message: "Você não tem permissão para editar este perfil." });
+        }
+
+        const data = request.body as any;
+
+        // Validação: profile_type é imutável (RN-003)
+        if (data.profileType) {
+          return reply.status(422).send({ message: "O tipo de perfil não pode ser alterado." });
+        }
+
+        const [updatedProfile] = await db
+          .update(profiles)
+          .set(data)
+          .where(eq(profiles.id, targetId))
+          .returning();
+
+        if (!updatedProfile) {
+          return reply.status(404).send({ message: "Perfil não encontrado." });
+        }
+
+        return reply.send(updatedProfile);
+      } catch (error) {
+        fastify.log.error(error);
+        return reply.status(500).send({ message: "Erro ao atualizar perfil." });
+      }
+    }
+  );
 };
