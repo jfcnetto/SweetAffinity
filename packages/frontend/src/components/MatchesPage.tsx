@@ -1,10 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { MatchService, MatchListProfile } from '../services/match.service.js';
 import toast from 'react-hot-toast';
+import MessageModal from './MessageModal.js';
+import { useAuth } from '../contexts/AuthContext.js';
 
 export default function MatchesPage() {
   const [matches, setMatches] = useState<MatchListProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedMatch, setSelectedMatch] = useState<any>(null);
+  
+  const { user } = useAuth();
 
   useEffect(() => {
     loadMatches();
@@ -20,6 +25,15 @@ export default function MatchesPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const openChat = (profile: any) => {
+    // Adapter profile payload for MessageModal format expected
+    setSelectedMatch({
+      id: profile.id,
+      display_name: profile.displayName,
+      primary_photo_url: profile.primaryPhotoUrl || null
+    });
   };
 
   if (loading) {
@@ -48,13 +62,27 @@ export default function MatchesPage() {
             <div className="p-4">
               <h3 className="font-bold text-lg text-gray-800">{match.profile.displayName}</h3>
               <p className="text-sm text-gray-500 capitalize mb-4">{match.profile.relationshipType}</p>
-              <button className="w-full py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors">
+              <button 
+                onClick={() => openChat(match.profile)}
+                className="w-full py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors"
+              >
                 Enviar Mensagem
               </button>
             </div>
           </div>
         ))}
       </div>
+
+      {selectedMatch && user && (
+        <MessageModal
+          recipient={selectedMatch}
+          onClose={() => setSelectedMatch(null)}
+          isPremiumUser={user.isPremium || false}
+          navigateTo={(page) => console.log('Navigate to:', page)}
+          currentUserType={user.relationshipType as any}
+          currentUserId={user.id}
+        />
+      )}
     </div>
   );
 }

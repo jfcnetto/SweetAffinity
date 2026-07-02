@@ -11,31 +11,7 @@ interface DBMessage {
   created_at: string;
 }
 
-// Phone number detection logic mantida perfeitamente intacta
-const containsPhoneNumber = (context: string, currentMessage: string): boolean => {
-    const numberMap: { [key: string]: string } = {
-        'zero': '0', 'um': '1', 'hum': '1', 'uma': '1', 'dois': '2', 'tres': '3',
-        'quatro': '4', 'cinco': '5', 'seis': '6', 'meia': '6', 'sete': '7',
-        'oito': '8', 'nove': '9', 'nono': '9', 'dez': '10'
-    };
-    const normalizeText = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    const numberWordsRegex = new RegExp(Object.keys(numberMap).join('|'), 'g');
-    const convertToDigits = (str: string) => normalizeText(str).replace(numberWordsRegex, match => numberMap[match]);
 
-    const currentMsgWithDigits = convertToDigits(currentMessage);
-    const currentMsgDigitsOnly = currentMsgWithDigits.replace(/\D/g, '');
-    const currentMsgNonNumericChars = convertToDigits(currentMessage).replace(/[\d\s]/g, '');
-
-    if (currentMsgDigitsOnly.length > 0 && currentMsgNonNumericChars.length < 4 && currentMessage.length < 30) {
-        return true;
-    }
-    const textWithDigits = convertToDigits(context);
-    const fullDigitString = textWithDigits.replace(/\D/g, '');
-    if (/\d{8,}/.test(fullDigitString)) {
-        return true;
-    }
-    return false;
-};
 
 interface MessageModalProps {
   recipient: Profile;
@@ -164,29 +140,6 @@ const MessageModal: React.FC<MessageModalProps> = ({ recipient, onClose, isPremi
     const handleSendMessage = () => {
         if (!newMessage.trim() || !isPremiumUser || !socketRef.current) return;
         
-        const recentMyMessages = messages
-            .filter(m => m.sender_id === currentUserId)
-            .slice(-10) 
-            .map(m => m.content)
-            .join(' ');
-        
-        const contextToCheck = `${recentMyMessages} ${newMessage}`;
-
-        if (containsPhoneNumber(contextToCheck, newMessage)) {
-             if (currentUserType === 'Baby') {
-                setError({
-                    message: 'O envio de contatos é um recurso exclusivo para assinantes. Faça um upgrade para poder enviar.',
-                    showUpgrade: true,
-                });
-                return;
-             }
-             setError({
-                 message: 'Para a segurança de todos, o compartilhamento de informações de contato não é permitido.',
-                 showUpgrade: false,
-             });
-             return;
-        }
-
         // Envia os dados estruturados pelo barramento de WebSockets do Socket.IO
         socketRef.current.emit('send_message', {
             sender_id: currentUserId,

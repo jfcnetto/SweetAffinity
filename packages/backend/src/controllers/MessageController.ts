@@ -113,6 +113,32 @@ export const initChatSocket = (io: Server) => {
     // SEND MESSAGE
     // =====================================================
 
+    const containsPhoneNumber = (currentMessage: string): boolean => {
+      const numberMap: { [key: string]: string } = {
+          'zero': '0', 'um': '1', 'hum': '1', 'uma': '1', 'dois': '2', 'tres': '3',
+          'quatro': '4', 'cinco': '5', 'seis': '6', 'meia': '6', 'sete': '7',
+          'oito': '8', 'nove': '9', 'nono': '9', 'dez': '10'
+      };
+      const normalizeText = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const numberWordsRegex = new RegExp(Object.keys(numberMap).join('|'), 'g');
+      const convertToDigits = (str: string) => normalizeText(str).replace(numberWordsRegex, match => numberMap[match]);
+
+      const currentMsgWithDigits = convertToDigits(currentMessage);
+      const currentMsgDigitsOnly = currentMsgWithDigits.replace(/\D/g, '');
+      const currentMsgNonNumericChars = convertToDigits(currentMessage).replace(/[\d\s]/g, '');
+
+      // Simple heuristic for standalone phone numbers
+      if (currentMsgDigitsOnly.length > 0 && currentMsgNonNumericChars.length < 4 && currentMessage.length < 30) {
+          return true;
+      }
+      
+      const fullDigitString = currentMsgWithDigits.replace(/\D/g, '');
+      if (/\d{8,}/.test(fullDigitString)) {
+          return true;
+      }
+      return false;
+    };
+
     socket.on(
       "send_message",
       async (data: {
@@ -125,6 +151,13 @@ export const initChatSocket = (io: Server) => {
           if (data.sender_id !== user.sub) {
             return socket.emit("message_error", {
               error: "Unauthorized sender",
+            });
+          }
+
+          // 🛡️ Segurança: Anti-DLP (Impede envio de contatos)
+          if (containsPhoneNumber(data.content)) {
+            return socket.emit("message_error", {
+              error: "Por questões de segurança, o envio de contatos pessoais não é permitido.",
             });
           }
 

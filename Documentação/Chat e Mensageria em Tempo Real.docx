@@ -1,0 +1,44 @@
+# Plano de Implementação: Fase 04 (Chat e Mensageria em Tempo Real)
+
+Este documento detalha o plano técnico para ativar e concluir a Fase 04 do Sweet Affinity, focando na mensageria via WebSockets (Socket.io) e na proteção contra vazamento de dados (DLP).
+
+## Contexto Atual
+Atualmente, o projeto já possui o esqueleto do `MessageController.ts` no backend (com Socket.io) e do `MessageModal.tsx` no frontend. No entanto, o fluxo não está fechado: os usuários não conseguem abrir o chat a partir da tela de Matches, e a validação de segurança (bloqueio de números de telefone) está ocorrendo *apenas* no frontend, o que representa uma vulnerabilidade.
+
+## User Review Required
+> [!IMPORTANT]
+> **Regra de Bloqueio de Telefones no Backend:**
+> A verificação de números de telefone e dados sensíveis (DLP) está sendo movida para o **Backend**. Se um usuário enviar um número de telefone no chat, a mensagem será bloqueada. Devemos suspender temporariamente a conta desse usuário ou apenas bloquear a mensagem com um aviso? *(O plano atual assume apenas o bloqueio da mensagem e aviso via WebSocket).*
+
+## Mudanças Propostas
+
+### Backend (Node.js / Fastify / Socket.io)
+
+O `MessageController.ts` será atualizado para garantir a segurança das comunicações.
+
+#### [MODIFY] `packages/backend/src/controllers/MessageController.ts`
+- **Filtro DLP (Data Loss Prevention) no Backend**:
+  - Implementar a função `containsPhoneNumber` (que verifica números, dígitos por extenso e combinações contextuais) diretamente no hook do evento `send_message` do Socket.io.
+  - Se a regra for violada, o backend **não** salvará a mensagem no banco e emitirá um evento de erro `message_error` pelo WebSocket de volta para o remetente, informando que a ação foi bloqueada (impedindo fraudes de quem tenta contornar o frontend).
+- **Tratamento de Permissões (Premium)**:
+  - Garantir que a validação de usuário Premium (para permitir certas exceções, se aplicável, ou limite de mensagens) seja verificada consultando a tabela `users.isPremium` no momento do envio da mensagem.
+
+### Frontend (React)
+
+As páginas e modais precisam ser conectadas ao fluxo real.
+
+#### [MODIFY] `packages/frontend/src/components/MatchesPage.tsx`
+- Adicionar o estado para controlar a abertura do `MessageModal`.
+- Ao clicar no botão **"Enviar Mensagem"** de um Match, o sistema abrirá o Modal de Chat passando as propriedades corretas (`recipient`, `currentUserId`, `currentUserType`, `isPremiumUser`).
+
+#### [MODIFY] `packages/frontend/src/components/MessageModal.tsx`
+- Limpar o código redundante do filtro de telefone no lado do cliente (opcionalmente mantendo um pré-filtro para UX rápida, mas confiando na resposta do servidor).
+- Atualizar a forma como o ID do usuário, tipo de perfil (Baby/Daddy) e status premium são injetados (buscando do `AuthContext` ou dos dados do usuário logado).
+- Ajustar a URL do Socket.io para respeitar variáveis de ambiente (evitar chumbamento de `http://localhost:4000`).
+
+## Verification Plan
+
+### Testes Manuais
+1. **Fluxo Feliz**: Abrir a aba de Matches, clicar em "Enviar Mensagem", e enviar uma mensagem normal. Verificar se ela aparece instantaneamente e se é persistida no banco (recarregando a página).
+2. **Filtro de Telefone (Segurança)**: Tentar enviar "Meu whats é 11 99999-8888". O frontend e o backend devem bloquear a mensagem e exibir o alerta vermelho de violação de diretrizes ou aviso de upgrade.
+3. **Múltiplos Clientes**: Abrir dois navegadores autenticados com usuários diferentes que deram match. O chat deve refletir a comunicação em tempo real de forma bidirecional.
