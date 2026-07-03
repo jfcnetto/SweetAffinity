@@ -109,6 +109,44 @@ export const reportReasonEnum = pgEnum("report_reason", [
   "other",
 ]);
 
+// CRM — novos enums
+export const financialEventTypeEnum = pgEnum("financial_event_type", [
+  "revenue",
+  "refund",
+  "chargeback",
+  "fee",
+  "manual_credit",
+  "manual_debit",
+]);
+
+export const specialAccessTypeEnum = pgEnum("special_access_type", [
+  "lifetime",
+  "free_premium",
+  "vip",
+  "tester",
+  "influencer",
+]);
+
+export const aiUsageStatusEnum = pgEnum("ai_usage_status", [
+  "success",
+  "error",
+  "timeout",
+]);
+
+export const campaignTypeEnum = pgEnum("campaign_type", [
+  "email",
+  "notification",
+  "both",
+]);
+
+export const campaignStatusEnum = pgEnum("campaign_status", [
+  "draft",
+  "scheduled",
+  "sending",
+  "sent",
+  "failed",
+]);
+
 // =====================================================
 // USERS
 // =====================================================
@@ -561,4 +599,207 @@ export const reports = pgTable(
     reportedIdx: index("reports_reported_idx").on(table.reportedId),
     statusIdx: index("reports_status_idx").on(table.status),
   })
+);
+
+// =====================================================
+// CRM — FINANCIAL EVENTS (Fluxo de Caixa)
+// =====================================================
+
+export const financialEvents = pgTable(
+  "financial_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    type: financialEventTypeEnum("type").notNull(),
+    amountCents: integer("amount_cents").notNull(), // positivo=entrada, negativo=saída
+    currency: text("currency").notNull().default("BRL"),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    subscriptionId: uuid("subscription_id").references(() => subscriptions.id, { onDelete: "set null" }),
+    stripeEventId: text("stripe_event_id"),
+    description: text("description"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    recordedAt: timestamp("recorded_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    typeIdx: index("fin_events_type_idx").on(table.type),
+    userIdx: index("fin_events_user_idx").on(table.userId),
+    recordedIdx: index("fin_events_recorded_idx").on(table.recordedAt),
+    stripeEventIdx: uniqueIndex("fin_events_stripe_idx").on(table.stripeEventId),
+  })
+);
+
+// =====================================================
+// CRM — AI USAGE LOGS (Controle de Tokens e Custos de IA)
+// =====================================================
+
+export const aiUsageLogs = pgTable(
+  "ai_usage_logs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    service: text("service").notNull(),       // 'openai', 'gemini', 'anthropic'
+    model: text("model").notNull(),            // 'gpt-4o', 'gemini-1.5-pro', etc.
+    feature: text("feature").notNull(),        // 'blog_generator', 'moderation', etc.
+    promptTokens: integer("prompt_tokens").notNull(),
+    completionTokens: integer("completion_tokens").notNull(),
+    totalTokens: integer("total_tokens").notNull(),
+    costUsd: doublePrecision("cost_usd"),      // custo estimado USD
+    costBrl: doublePrecision("cost_brl"),      // convertido pela taxa do dia
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    requestId: text("request_id"),
+    status: aiUsageStatusEnum("status").notNull().default("success"),
+    latencyMs: integer("latency_ms"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    serviceIdx: index("ai_usage_service_idx").on(table.service),
+    featureIdx: index("ai_usage_feature_idx").on(table.feature),
+    createdIdx: index("ai_usage_created_idx").on(table.createdAt),
+  })
+);
+
+// =====================================================
+// CRM — AI BUDGET CONFIG (Limites de orçamento por serviço)
+// =====================================================
+
+export const aiBudgetConfig = pgTable(
+  "ai_budget_config",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    service: text("service").notNull(),
+    dailyLimitUsd: doublePrecision("daily_limit_usd").notNull().default(5.00),
+    monthlyLimitUsd: doublePrecision("monthly_limit_usd").notNull().default(50.00),
+    alertThreshold: doublePrecision("alert_threshold").notNull().default(80), // % do limite
+    isEnabled: boolean("is_enabled").notNull().default(true),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    serviceIdx: uniqueIndex("ai_budget_service_idx").on(table.service),
+  })
+);
+
+// =====================================================
+// CRM — USER SPECIAL ACCESS (Perfis Vitalícios, Free, VIP)
+// =====================================================
+
+export const userSpecialAccess = pgTable(
+  "user_special_access",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    accessType: specialAccessTypeEnum("access_type").notNull(),
+    reason: text("reason"),
+    grantedBy: uuid("granted_by").references(() => users.id, { onDelete: "set null" }),
+    validUntil: timestamp("valid_until", { withTimezone: true }), // NULL = vitalício
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    userIdx: index("special_access_user_idx").on(table.userId),
+    typeIdx: index("special_access_type_idx").on(table.accessType),
+    activeIdx: index("special_access_active_idx").on(table.isActive),
+  })
+);
+
+// =====================================================
+// CRM — ADMIN ROLES (RBAC — Permissões Granulares)
+// =====================================================
+
+export const adminRoles = pgTable(
+  "admin_roles",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: text("name").notNull(),
+    description: text("description"),
+    permissions: jsonb("permissions").notNull().$type<Record<string, boolean>>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
+  },
+  (table) => ({
+    nameIdx: uniqueIndex("admin_roles_name_idx").on(table.name),
+  })
+);
+
+// =====================================================
+// CRM — ADMIN USERS (Usuários do painel administrativo)
+// =====================================================
+
+export const adminUsers = pgTable(
+  "admin_users",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    roleId: uuid("role_id").references(() => adminRoles.id, { onDelete: "restrict" }),
+    isActive: boolean("is_active").notNull().default(true),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    lastLogin: timestamp("last_login", { withTimezone: true }),
+    ipWhitelist: jsonb("ip_whitelist").$type<string[]>(),
+    twoFactorSecret: text("two_factor_secret"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    userIdx: uniqueIndex("admin_users_user_idx").on(table.userId),
+    roleIdx: index("admin_users_role_idx").on(table.roleId),
+  })
+);
+
+// =====================================================
+// CRM — USER CRM NOTES (Notas internas por usuário)
+// =====================================================
+
+export const userCrmNotes = pgTable(
+  "user_crm_notes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    authorId: uuid("author_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    content: text("content").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    userIdx: index("crm_notes_user_idx").on(table.userId),
+    createdIdx: index("crm_notes_created_idx").on(table.createdAt),
+  })
+);
+
+// =====================================================
+// CRM — BROADCAST CAMPAIGNS (E-mails e Notificações em Massa)
+// =====================================================
+
+export const broadcastCampaigns = pgTable(
+  "broadcast_campaigns",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    title: text("title").notNull(),
+    type: campaignTypeEnum("type").notNull(),
+    targetSegment: jsonb("target_segment").$type<Record<string, unknown>>(),
+    subject: text("subject"),
+    bodyHtml: text("body_html"),
+    notificationTitle: text("notification_title"),
+    notificationBody: text("notification_body"),
+    status: campaignStatusEnum("status").notNull().default("draft"),
+    scheduledFor: timestamp("scheduled_for", { withTimezone: true }),
+    sentCount: integer("sent_count").notNull().default(0),
+    openedCount: integer("opened_count").notNull().default(0),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    statusIdx: index("campaigns_status_idx").on(table.status),
+    scheduledIdx: index("campaigns_scheduled_idx").on(table.scheduledFor),
+  })
+);
+
+// =====================================================
+// CRM — SITE SETTINGS (Configurações Globais)
+// =====================================================
+
+export const siteSettings = pgTable(
+  "site_settings",
+  {
+    key: text("key").primaryKey(),
+    value: jsonb("value").notNull(),
+    updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
+  }
 );

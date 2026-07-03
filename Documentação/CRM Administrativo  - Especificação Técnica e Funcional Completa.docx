@@ -1,0 +1,517 @@
+# Sweet Affinity — CRM Administrativo
+## Especificação Técnica e Funcional Completa
+### Versão 1.0 • Julho 2026 • CONFIDENCIAL
+
+---
+
+## 1. Visão Geral
+
+O painel administrativo atual será evoluído para um **CRM Operacional Completo**, centralizando:
+
+- 💰 **Fluxo de Caixa** — receita, inadimplência, reembolsos, projeções
+- 🤖 **Centro de Controle de IA** — consumo de tokens, custo por modelo, alertas de orçamento
+- 🔐 **Gestão de Acessos e Permissões** — roles granulares, perfis vitalícios, liberações manuais
+- 👥 **CRM de Usuários** — pipeline de conversão, segmentação, ações em lote
+- 📊 **Analytics Avançado** — KPIs em tempo real, funil de conversão, churn preditivo
+- 📢 **Central de Comunicação** — notificações, e-mails em massa, broadcast segmentado
+
+---
+
+## 2. Arquitetura do CRM
+
+### 2.1 Módulos Principais
+
+```
+/admin
+├── /dashboard          → KPIs em tempo real (painel principal)
+├── /users              → CRM de usuários com pipeline
+│   ├── /[id]           → Ficha completa do usuário
+│   └── /segments       → Segmentação e filtros avançados
+├── /finance            → Fluxo de caixa e financeiro
+│   ├── /cashflow       → Receita/despesas por período
+│   ├── /subscriptions  → Gestão de assinaturas
+│   └── /reports        → Relatórios exportáveis
+├── /ai-control         → Centro de controle de IA
+│   ├── /usage          → Consumo de tokens por modelo
+│   ├── /costs          → Custo diário/mensal por serviço
+│   └── /budget         → Limites e alertas de orçamento
+├── /access             → Controle de acessos
+│   ├── /roles          → Gerenciamento de permissões
+│   ├── /admins         → Usuários administradores
+│   └── /special        → Perfis especiais (vitalícios, free liberados)
+├── /moderation         → Moderação de conteúdo
+├── /reports            → Central de denúncias
+├── /communications     → Notificações e e-mails em massa
+└── /settings           → Configurações globais do site
+```
+
+---
+
+## 3. Módulo 1 — Dashboard Principal
+
+### 3.1 KPIs em Tempo Real (Atualização a cada 60s)
+
+| Métrica | Cálculo | Visualização |
+|---|---|---|
+| MRR (Receita Recorrente Mensal) | Σ assinaturas ativas × valor plano | Card + sparkline |
+| ARR (Anual) | MRR × 12 | Card |
+| Novos usuários hoje | COUNT users WHERE created_at >= today | Card + tendência |
+| Taxa de conversão Free→Premium | premium_users / total_users × 100 | Card + gauge |
+| Churn Rate (30d) | cancelamentos / total_subs_início_mês × 100 | Card + cor semáforo |
+| Usuários ativos agora | Sessões ativas no Redis (TTL) | Card em tempo real |
+| Denúncias pendentes | COUNT reports WHERE status = 'pending' | Badge de urgência |
+| Custo IA hoje | Σ ai_usage WHERE date = today | Card com alerta |
+
+### 3.2 Gráficos do Dashboard
+
+- **Receita × Tempo** — Linha com MRR diário dos últimos 30 dias
+- **Funil de Conversão** — Cadastros → Verificados → Premium (Sankey ou barras empilhadas)
+- **Mapa de Calor de Usuários** — Atividade por hora/dia da semana
+- **Distribuição de Planos** — Pizza: Gratuito / Premium / Diamante / Vitalício
+- **Custo IA por Dia** — Barras por modelo (GPT-4o, Gemini, etc.)
+
+---
+
+## 4. Módulo 2 — CRM de Usuários
+
+### 4.1 Pipeline de Usuários (Estilo Kanban/CRM)
+
+```
+[Cadastrado] → [Email Verificado] → [Perfil Completo] → [Premium] → [Churned]
+```
+
+Cada coluna exibe contagem e permite arrastar usuários entre estágios (ação manual de admin).
+
+### 4.2 Ficha Completa do Usuário (`/admin/users/:id`)
+
+**Seção: Dados Pessoais**
+- Nome, email, telefone, tipo de perfil (Baby/Daddy/Mommy)
+- Status atual + histórico de mudanças de status com timestamps
+- Foto de perfil + documentos enviados para verificação
+- IP de cadastro + geolocalização
+
+**Seção: Histórico Financeiro**
+- Todas as assinaturas (ativas, canceladas, expiradas)
+- Todos os pagamentos com status (aprovado, falhou, reembolsado)
+- LTV (Lifetime Value) calculado
+- MRR contribuído
+
+**Seção: Engajamento**
+- Último login, frequência de acesso (gráfico 30d)
+- Matches realizados, mensagens enviadas
+- Perfis visitados e visitantes
+
+**Seção: Tipo de Conta Especial**
+- [ ] Conta Vitalícia — acesso premium permanente sem cobrança
+- [ ] Free Liberado — acesso a recursos premium sem assinatura (whitelist manual)
+- [ ] Conta de Teste — marcador para testes internos (excluída de KPIs)
+- [ ] VIP / Influenciador — badge especial no perfil público
+
+**Seção: Ações do Admin**
+- Aprovar / Rejeitar cadastro
+- Banir / Suspender / Reativar
+- Resetar senha manualmente
+- Enviar e-mail individual
+- Adicionar nota interna (CRM note — não visível ao usuário)
+- Mover para lista especial (vitalício, free, VIP)
+- Forçar logout de todos os dispositivos
+
+### 4.3 Segmentação Avançada
+
+Filtros combináveis para criar segmentos:
+
+| Filtro | Opções |
+|---|---|
+| Tipo de perfil | Baby / Daddy / Mommy |
+| Status da conta | Active / Pending / Suspended / Banned |
+| Plano | Free / Premium / Diamante / Vitalício |
+| Localização | Estado (UF), Cidade |
+| Período de cadastro | Últimas 24h / 7d / 30d / 90d / custom |
+| Engajamento | Com match / Sem match / Com mensagem / Inativo +30d |
+| Valor financeiro | LTV > R$X / Nunca pagou / Ex-assinante |
+
+**Ações em Lote** (sobre segmento selecionado):
+- Enviar e-mail em massa
+- Enviar notificação in-app
+- Exportar CSV
+- Banir em massa
+- Aplicar desconto/cupom
+
+---
+
+## 5. Módulo 3 — Fluxo de Caixa
+
+### 5.1 Tabela: `financial_events`
+
+```sql
+id              UUID PRIMARY KEY
+type            ENUM('revenue','refund','chargeback','fee','manual_credit','manual_debit')
+amount_cents    INTEGER NOT NULL        -- positivo = entrada, negativo = saída
+currency        CHAR(3) DEFAULT 'BRL'
+user_id         UUID REFERENCES users(id)
+subscription_id UUID REFERENCES subscriptions(id)
+stripe_event_id TEXT UNIQUE            -- idempotência
+description     TEXT
+recorded_at     TIMESTAMPTZ DEFAULT NOW()
+created_by      UUID REFERENCES users(id) -- admin que registrou (se manual)
+```
+
+### 5.2 Painel de Fluxo de Caixa (`/admin/finance/cashflow`)
+
+**Visões disponíveis:**
+- Diário / Semanal / Mensal / Anual
+- Por categoria (receita de assinatura, reembolsos, taxas Stripe)
+- Por plano (Premium vs Diamante)
+
+**Métricas calculadas:**
+
+| Métrica | Fórmula |
+|---|---|
+| Receita Bruta | Σ amount WHERE type = 'revenue' |
+| Reembolsos | Σ amount WHERE type = 'refund' |
+| Chargebacks | Σ amount WHERE type = 'chargeback' |
+| Taxas Stripe (~3.5%) | Σ amount WHERE type = 'fee' |
+| Receita Líquida | Bruta - Reembolsos - Chargebacks - Taxas |
+| Inadimplência | COUNT subscriptions WHERE status = 'past_due' |
+| Ticket Médio | Receita / Novos assinantes |
+
+### 5.3 Exportação Financeira
+
+Formatos: **CSV, Excel (.xlsx), PDF**
+Filtros: Período, tipo de evento, plano, status
+Uso: Conciliação contábil mensal, declaração fiscal
+
+### 5.4 Gestão de Reembolsos
+
+- Admin visualiza pagamentos elegíveis para reembolso (até 7 dias)
+- Clica em "Reembolsar" → API chama `stripe.refunds.create()`
+- Registra `financial_event` com type = 'refund'
+- Notifica usuário automaticamente por e-mail
+
+---
+
+## 6. Módulo 4 — Centro de Controle de IA
+
+### 6.1 Tabela: `ai_usage_logs`
+
+```sql
+id              UUID PRIMARY KEY
+service         TEXT NOT NULL           -- 'openai', 'gemini', 'anthropic', etc.
+model           TEXT NOT NULL           -- 'gpt-4o', 'gemini-1.5-pro', etc.
+feature         TEXT NOT NULL           -- 'blog_generator', 'moderation', 'support_chat'
+prompt_tokens   INTEGER NOT NULL
+completion_tokens INTEGER NOT NULL
+total_tokens    INTEGER NOT NULL
+cost_usd        DECIMAL(10,6)           -- custo estimado em USD
+cost_brl        DECIMAL(10,2)           -- convertido pela taxa do dia
+user_id         UUID REFERENCES users(id) -- quem disparou (se aplicável)
+request_id      TEXT UNIQUE             -- ID único da chamada de API
+status          ENUM('success','error','timeout')
+latency_ms      INTEGER
+created_at      TIMESTAMPTZ DEFAULT NOW()
+```
+
+### 6.2 Tabela: `ai_budget_config`
+
+```sql
+id              UUID PRIMARY KEY
+service         TEXT NOT NULL           -- 'openai', 'gemini', etc.
+daily_limit_usd DECIMAL(10,2)           -- limite diário em USD
+monthly_limit_usd DECIMAL(10,2)         -- limite mensal em USD
+alert_threshold DECIMAL(5,2) DEFAULT 80  -- alertar em X% do limite
+is_enabled      BOOLEAN DEFAULT true    -- liga/desliga o serviço
+created_at      TIMESTAMPTZ DEFAULT NOW()
+updated_at      TIMESTAMPTZ DEFAULT NOW()
+```
+
+### 6.3 Painel de Uso de IA (`/admin/ai-control`)
+
+**Cards de Resumo:**
+- Custo total hoje (USD e BRL)
+- Custo total este mês
+- Tokens consumidos hoje
+- Modelo mais usado
+- % do budget diário consumido
+
+**Tabela Detalhada (por chamada):**
+| Coluna | Descrição |
+|---|---|
+| Timestamp | Data/hora da chamada |
+| Serviço | OpenAI / Gemini / Anthropic |
+| Modelo | gpt-4o / gemini-1.5-pro / etc. |
+| Feature | Blog Generator / Moderação / etc. |
+| Tokens (prompt + completion) | Detalhado |
+| Custo USD | Calculado pela tabela de preços |
+| Custo BRL | USD × cotação do dia |
+| Status | Sucesso / Erro / Timeout |
+| Latência | ms |
+
+**Gráficos:**
+- Barras: Custo por dia (últimos 30 dias) por serviço
+- Pizza: Distribuição de uso por feature
+- Linha: Tokens/hora durante o dia
+
+### 6.4 Sistema de Alertas de Budget
+
+Quando consumo atingir o `alert_threshold` (ex: 80% do limite diário):
+1. Notificação in-app para todos os admins
+2. E-mail automático para o Super Admin
+3. Se atingir 100%: desabilita automaticamente a feature correspondente
+
+**Regras de custo por modelo (tabela de referência):**
+| Modelo | Custo por 1M tokens input | Custo por 1M tokens output |
+|---|---|---|
+| gpt-4o | $2.50 | $10.00 |
+| gpt-4o-mini | $0.15 | $0.60 |
+| gemini-1.5-pro | $1.25 | $5.00 |
+| gemini-1.5-flash | $0.075 | $0.30 |
+| claude-3.5-sonnet | $3.00 | $15.00 |
+
+> Os valores são configuráveis pelo admin para refletir descontos de volume.
+
+---
+
+## 7. Módulo 5 — Controle de Acessos e Permissões
+
+### 7.1 Tabela: `admin_roles`
+
+```sql
+id          UUID PRIMARY KEY
+name        TEXT NOT NULL UNIQUE     -- 'super_admin', 'moderator', 'financial', 'support'
+description TEXT
+permissions JSONB NOT NULL           -- { "users.view": true, "users.ban": false, ... }
+created_at  TIMESTAMPTZ DEFAULT NOW()
+```
+
+### 7.2 Tabela: `admin_users`
+
+```sql
+id          UUID PRIMARY KEY
+user_id     UUID REFERENCES users(id) UNIQUE
+role_id     UUID REFERENCES admin_roles(id)
+is_active   BOOLEAN DEFAULT true
+created_by  UUID REFERENCES users(id)
+last_login  TIMESTAMPTZ
+ip_whitelist TEXT[]                  -- IPs permitidos (opcional)
+2fa_secret  TEXT                     -- TOTP para 2FA obrigatório
+created_at  TIMESTAMPTZ DEFAULT NOW()
+```
+
+### 7.3 Permissões Granulares (Sistema RBAC)
+
+| Permissão | Super Admin | Moderador | Financeiro | Suporte |
+|---|---|---|---|---|
+| `users.view` | ✅ | ✅ | ✅ | ✅ |
+| `users.edit` | ✅ | ✅ | ❌ | ✅ |
+| `users.ban` | ✅ | ✅ | ❌ | ❌ |
+| `users.delete` | ✅ | ❌ | ❌ | ❌ |
+| `users.special_access` | ✅ | ❌ | ❌ | ❌ |
+| `photos.moderate` | ✅ | ✅ | ❌ | ❌ |
+| `reports.view` | ✅ | ✅ | ❌ | ✅ |
+| `reports.resolve` | ✅ | ✅ | ❌ | ❌ |
+| `finance.view` | ✅ | ❌ | ✅ | ❌ |
+| `finance.refund` | ✅ | ❌ | ✅ | ❌ |
+| `finance.export` | ✅ | ❌ | ✅ | ❌ |
+| `ai.view` | ✅ | ❌ | ✅ | ❌ |
+| `ai.config` | ✅ | ❌ | ❌ | ❌ |
+| `admin.manage` | ✅ | ❌ | ❌ | ❌ |
+| `settings.edit` | ✅ | ❌ | ❌ | ❌ |
+| `communications.send` | ✅ | ✅ | ❌ | ✅ |
+
+### 7.4 Tabela: `user_special_access`
+
+```sql
+id              UUID PRIMARY KEY
+user_id         UUID REFERENCES users(id) UNIQUE
+access_type     ENUM('lifetime','free_premium','vip','tester','influencer')
+reason          TEXT                    -- Motivo da concessão
+granted_by      UUID REFERENCES users(id)
+valid_until     TIMESTAMPTZ             -- NULL = sem expiração (vitalício)
+is_active       BOOLEAN DEFAULT true
+created_at      TIMESTAMPTZ DEFAULT NOW()
+```
+
+**Tipos de Acesso Especial:**
+
+| Tipo | Descrição | Regra de Negócio |
+|---|---|---|
+| `lifetime` | **Vitalício** — Acesso premium permanente sem cobrança | Isento de verificação de assinatura Stripe. Badge exclusivo no perfil. |
+| `free_premium` | **Free Liberado** — recursos premium temporariamente | Admin define data de validade. Ideal para beta testers e influenciadores. |
+| `vip` | **VIP** — Badge e destaque no feed | Não bypassa pagamento, mas recebe benefícios visuais extras. |
+| `tester` | **Conta de Teste** | Excluída dos KPIs e métricas. Pode ter dados fictícios. |
+| `influencer` | **Influenciador** | Free premium + badge + relatório semanal de visibilidade. |
+
+---
+
+## 8. Módulo 6 — Central de Comunicação
+
+### 8.1 Tabela: `broadcast_campaigns`
+
+```sql
+id              UUID PRIMARY KEY
+title           TEXT NOT NULL
+type            ENUM('email','notification','both')
+target_segment  JSONB                   -- Filtros do segmento alvo
+subject         TEXT                    -- Para e-mails
+body_html       TEXT                    -- Corpo do e-mail
+notification_title TEXT
+notification_body  TEXT
+status          ENUM('draft','scheduled','sending','sent','failed')
+scheduled_for   TIMESTAMPTZ             -- NULL = imediato
+sent_count      INTEGER DEFAULT 0
+opened_count    INTEGER DEFAULT 0
+created_by      UUID REFERENCES users(id)
+created_at      TIMESTAMPTZ DEFAULT NOW()
+sent_at         TIMESTAMPTZ
+```
+
+### 8.2 Funcionalidades
+
+- **Editor rico de e-mail** com preview HTML
+- **Agendamento** de envio para data/hora futura
+- **Segmentação** usando os mesmos filtros do CRM de usuários
+- **Métricas de abertura** (rastreamento via pixel de 1x1)
+- **Templates reutilizáveis** (boas-vindas, promoção, alerta)
+
+---
+
+## 9. Módulo 7 — Configurações Globais
+
+### 9.1 Tabela: `site_settings`
+
+```sql
+key     TEXT PRIMARY KEY
+value   JSONB NOT NULL
+updated_by UUID REFERENCES users(id)
+updated_at TIMESTAMPTZ DEFAULT NOW()
+```
+
+**Configurações disponíveis:**
+
+| Chave | Tipo | Descrição |
+|---|---|---|
+| `maintenance_mode` | boolean | Coloca o site em manutenção |
+| `free_daily_message_limit` | integer | Limite de mensagens/dia para plano free |
+| `premium_price_cents` | integer | Valor do plano Premium em centavos |
+| `diamante_price_cents` | integer | Valor do plano Diamante em centavos |
+| `new_registrations_open` | boolean | Habilita/desabilita novos cadastros |
+| `recaptcha_enabled` | boolean | Ativa/desativa reCAPTCHA |
+| `ai_blog_auto_publish` | boolean | Blog IA publica automaticamente ou vai para rascunho |
+| `profile_view_notification_premium_only` | boolean | Notificação de visita só para premium |
+| `exchange_rate_usd_brl` | float | Taxa de câmbio para conversão de custo de IA |
+
+---
+
+## 10. Endpoints de API — CRM Admin
+
+### 10.1 Novos Endpoints
+
+```
+# CRM de Usuários
+GET  /admin/users                      → Lista paginada com filtros
+GET  /admin/users/:id                  → Ficha completa
+PUT  /admin/users/:id/special-access   → Conceder/revogar acesso especial
+POST /admin/users/:id/notes            → Adicionar nota CRM
+GET  /admin/users/segments             → Segmentos salvos
+POST /admin/users/bulk-action          → Ação em lote
+
+# Financeiro
+GET  /admin/finance/cashflow           → Fluxo de caixa por período
+GET  /admin/finance/subscriptions      → Todas as assinaturas
+POST /admin/finance/refund             → Emitir reembolso via Stripe
+GET  /admin/finance/export             → Exportar relatório (CSV/XLSX)
+
+# Controle de IA
+GET  /admin/ai/usage                   → Logs de uso de IA
+GET  /admin/ai/costs                   → Custo diário/mensal agregado
+GET  /admin/ai/budget                  → Configuração de budget
+PUT  /admin/ai/budget/:service         → Atualizar limite de budget
+GET  /admin/ai/budget/alerts           → Alertas ativos de custo
+
+# Controle de Acessos
+GET  /admin/access/roles               → Lista de roles
+POST /admin/access/roles               → Criar nova role
+PUT  /admin/access/roles/:id           → Editar permissões
+GET  /admin/access/admins              → Lista de admin users
+POST /admin/access/admins              → Adicionar admin
+PUT  /admin/access/admins/:id          → Editar admin (role, status)
+
+# Comunicações
+GET  /admin/communications/campaigns   → Lista de campanhas
+POST /admin/communications/campaigns   → Criar campanha
+POST /admin/communications/campaigns/:id/send → Disparar campanha
+
+# Configurações
+GET  /admin/settings                   → Todas as configurações
+PUT  /admin/settings/:key              → Atualizar configuração
+```
+
+---
+
+## 11. Plano de Implementação
+
+### FASE A — Fundação CRM (2 semanas)
+
+| Tarefa | Prioridade | Esforço |
+|---|---|---|
+| Criar tabelas: `financial_events`, `ai_usage_logs`, `ai_budget_config`, `user_special_access`, `admin_roles`, `admin_users`, `broadcast_campaigns`, `site_settings` | P1 | 2d |
+| Refatorar middleware de auth admin para RBAC (checar permissão por rota) | P1 | 1d |
+| Implementar endpoints financeiros básicos (cashflow, subscriptions, export) | P1 | 2d |
+| Implementar endpoints de acesso especial (vitalício, free_premium) | P1 | 1d |
+| Middleware de log automático de chamadas de IA (`ai_usage_logs`) | P1 | 1d |
+| Endpoints de budget e alertas de IA | P2 | 1d |
+| Endpoint de ação em lote de usuários | P2 | 1d |
+
+### FASE B — Interface CRM (2 semanas)
+
+| Tarefa | Prioridade | Esforço |
+|---|---|---|
+| Dashboard: cards KPI em tempo real (polling 60s) | P1 | 2d |
+| Dashboard: gráficos (Recharts — já instalado) | P1 | 1d |
+| Página CRM de usuários com filtros + paginação | P1 | 2d |
+| Ficha individual do usuário (todas as seções) | P1 | 2d |
+| Painel Financeiro — fluxo de caixa e gráficos | P1 | 1d |
+| Painel de IA — tabela de uso + custo por dia | P2 | 1d |
+| Gerenciamento de acessos e roles | P2 | 1d |
+
+### FASE C — Comunicações e Configurações (1 semana)
+
+| Tarefa | Prioridade | Esforço |
+|---|---|---|
+| Central de comunicações — criação de campanhas | P2 | 2d |
+| Editor de e-mail com preview | P2 | 1d |
+| Painel de configurações globais do site | P2 | 1d |
+| Exportação financeira (CSV + Excel) | P1 | 1d |
+
+---
+
+## 12. Questões em Aberto (Para Alinhamento)
+
+> [!IMPORTANT]
+> **Modelos de IA:** Quais serviços você planeja usar? OpenAI, Gemini (Google), Anthropic (Claude)?
+> O painel de controle de tokens será configurado para o(s) serviço(s) escolhido(s).
+
+> [!IMPORTANT]
+> **Perfis Vitalícios:** Haverá uma taxa única cobrada para perfis vitalícios, ou serão somente concessões manuais do admin? Isso impacta se criaremos um produto Stripe para isso.
+
+> [!IMPORTANT]
+> **2FA nos Admins:** Deseja que o 2FA (autenticador) seja obrigatório para todos os administradores, ou apenas para o Super Admin?
+
+> [!NOTE]
+> **Taxa de câmbio USD/BRL:** O custo das APIs de IA é cobrado em USD. Devemos buscar a taxa em tempo real via API do Banco Central (PTAX) ou usar uma taxa fixa configurada pelo admin?
+
+> [!NOTE]
+> **IP Whitelist nos Admins:** Deseja restringir o acesso ao painel `/admin` a IPs específicos (ex: VPN da empresa)?
+
+---
+
+## 13. Estimativa de Custo de Implementação
+
+| Fase | Semanas | Complexidade |
+|---|---|---|
+| Fase A — Backend + Schema | 2 semanas | Alta |
+| Fase B — Interface CRM | 2 semanas | Alta |
+| Fase C — Comunicações | 1 semana | Média |
+| **Total** | **5 semanas** | — |
+
+**Custo de infra adicional:** R$ 0,00 (tudo self-hosted na mesma VPS, usando PostgreSQL + Redis existentes)

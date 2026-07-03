@@ -30,6 +30,12 @@ import { paymentRoutes } from "./controllers/PaymentController.js";
 import { notificationRoutes } from "./controllers/NotificationController.js";
 import { lgpdRoutes } from "./controllers/LgpdController.js";
 import { subscriptionRoutes } from "./controllers/SubscriptionController.js";
+// CRM
+import { financeRoutes } from "./controllers/FinanceController.js";
+import { aiUsageRoutes } from "./controllers/AiUsageController.js";
+import { accessRoutes } from "./controllers/AccessController.js";
+import { communicationsRoutes } from "./controllers/CommunicationsController.js";
+import { siteSettingsRoutes } from "./controllers/SiteSettingsController.js";
 
 // Segurança & Monitoramento
 import helmet from "@fastify/helmet";
@@ -190,6 +196,27 @@ async function start() {
 
     await server.register(subscriptionRoutes, {
       prefix: "/subscriptions",
+    });
+
+    // CRM — Painel Administrativo Completo
+    await server.register(financeRoutes, {
+      prefix: "/admin/finance",
+    });
+
+    await server.register(aiUsageRoutes, {
+      prefix: "/admin/ai",
+    });
+
+    await server.register(accessRoutes, {
+      prefix: "/admin/access",
+    });
+
+    await server.register(communicationsRoutes, {
+      prefix: "/admin/communications",
+    });
+
+    await server.register(siteSettingsRoutes, {
+      prefix: "/admin/settings",
     });
 
     // =====================================================

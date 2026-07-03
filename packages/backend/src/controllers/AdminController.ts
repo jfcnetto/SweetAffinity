@@ -1,7 +1,8 @@
 import { FastifyInstance, FastifyReply } from "fastify";
 import { db } from "../db/index.js";
 import { users, profiles, photos, reports, auditLogs, subscriptions } from "../db/schema.js";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and, sum, count } from "drizzle-orm";
+import { requirePermission } from "../middleware/rbac.js";
 
 // =====================================================
 // ADMIN ROUTES
@@ -9,36 +10,50 @@ import { eq, desc, sql } from "drizzle-orm";
 
 export const adminRoutes = async (fastify: FastifyInstance) => {
   // =====================================================
-  // AUTH MIDDLEWARE
+  // 1. DASHBOARD & KPIs
   // =====================================================
 
-  fastify.addHook("preHandler", async (request, reply) => {
+  fastify.get("/dashboard", async (request, reply) => {
     try {
-      await request.jwtVerify();
-
-      const user = request.user as {
-        sub: string;
-        profileType?: string;
-      };
-
-      if (user.profileType !== "admin") {
-        return reply.status(403).send({
-          message:
-            "Acesso negado. Recurso exclusivo para administradores.",
-        });
-      }
-    } catch {
-      return reply.status(401).send({
-        message: "Sessão inválida ou expirada.",
+      const usersResult = await db.execute(sql`
+        SELECT count(*) as total FROM users WHERE status = 'active'
+      `);
+      
+      const subsResult = await db.execute(sql`
+        SELECT count(*) as total, SUM(amount) as mrr FROM subscriptions WHERE status = 'active'
+      `);
+      
+      const matchResult = await db.execute(sql`
+        SELECT count(*) as total FROM matches
+      `);
+      
+      const reportsResult = await db.execute(sql`
+        SELECT count(*) as total FROM reports WHERE status = 'pending'
+      `);
+      
+      const mrr = Number(subsResult.rows[0]?.mrr ?? 0) / 100;
+      
+      return reply.send({
+        totalActiveUsers: Number(usersResult.rows[0]?.total ?? 0),
+        activeSubscriptions: Number(subsResult.rows[0]?.total ?? 0),
+        mrr,
+        arr: mrr * 12,
+        totalMatches: Number(matchResult.rows[0]?.total ?? 0),
+        pendingReports: Number(reportsResult.rows[0]?.total ?? 0),
       });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.status(500).send({ message: "Erro ao carregar dashboard" });
     }
   });
 
   // =====================================================
-  // 1. LISTAR USUÁRIOS
+  // 2. LISTAR USUÁRIOS
   // =====================================================
 
-  fastify.get("/users", async (request, reply) => {
+  fastify.get("/users", {
+    preHandler: [requirePermission("users.view")]
+  }, async (request, reply) => {
     const { limit = 20, offset = 0 } = request.query as {
       limit?: number;
       offset?: number;
@@ -76,7 +91,9 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
   // 2. ALTERAR STATUS DO USUÁRIO
   // =====================================================
 
-  fastify.put("/users/:id/status", async (request, reply) => {
+  fastify.put("/users/:id/status", {
+    preHandler: [requirePermission("users.edit")] // Assume edit is required. For ban, there is a specific route.
+  }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { status } = request.body as {
       status: "active" | "inactive" | "suspended" | "banned";
@@ -126,10 +143,68 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
   });
 
   // =====================================================
-  // 3. FOTOS PENDENTES
+  // 3. FICHA COMPLETA CRM DO USUÁRIO
   // =====================================================
 
-  fastify.get("/photos/pending", async (request, reply) => {
+  fastify.get("/users/:id/crm", {
+    preHandler: [requirePermission("users.view")]
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+
+    try {
+      // Básico
+      const [user] = await db.select().from(users).where(eq(users.id, id));
+      const [profile] = await db.select().from(profiles).where(eq(profiles.id, id));
+      
+      if (!user) return reply.status(404).send({ message: "Usuário não encontrado." });
+
+      // Assinaturas
+      const userSubs = await db.execute(sql`
+        SELECT id, plan_id, status, amount, current_period_end, created_at 
+        FROM subscriptions WHERE user_id = ${id} ORDER BY created_at DESC
+      `);
+
+      // Acessos especiais (Vitalício, Free Premium, VIP)
+      const specialAccess = await db.execute(sql`
+        SELECT id, access_type, valid_until, is_active, reason, created_at 
+        FROM user_special_access WHERE user_id = ${id} ORDER BY created_at DESC
+      `);
+
+      // Eventos Financeiros
+      const finances = await db.execute(sql`
+        SELECT id, type, amount_cents, currency, description, recorded_at 
+        FROM financial_events WHERE user_id = ${id} ORDER BY recorded_at DESC
+      `);
+
+      // Notas de CRM
+      const notes = await db.execute(sql`
+        SELECT n.id, n.content, n.created_at, p.display_name AS author_name 
+        FROM user_crm_notes n 
+        LEFT JOIN profiles p ON p.id = n.author_id 
+        WHERE n.user_id = ${id} ORDER BY n.created_at DESC
+      `);
+
+      return reply.send({
+        user,
+        profile: profile ?? null,
+        subscriptions: userSubs.rows,
+        specialAccess: specialAccess.rows,
+        financialEvents: finances.rows,
+        crmNotes: notes.rows,
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.status(500).send({ message: "Erro ao buscar ficha CRM." });
+    }
+  });
+
+  // =====================================================
+  // 4. FOTOS PENDENTES
+  // =====================================================
+
+  fastify.get("/photos/pending", {
+    preHandler: [requirePermission("photos.moderate")]
+  }, async (request, reply) => {
     try {
       const pendingPhotos = await db
         .select({
@@ -171,7 +246,9 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
   // 4. MODERAÇÃO DE FOTO
   // =====================================================
 
-  fastify.put("/photos/:id/approval", async (request, reply) => {
+  fastify.put("/photos/:id/approval", {
+    preHandler: [requirePermission("photos.moderate")]
+  }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { approved } = request.body as { approved: boolean };
 
@@ -293,7 +370,9 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
   // Seção 6.1: Central de denúncias categorizadas por gravidade e cronologia
   // =====================================================
 
-  fastify.get("/reports", async (request, reply: FastifyReply) => {
+  fastify.get("/reports", {
+    preHandler: [requirePermission("reports.view")]
+  }, async (request, reply: FastifyReply) => {
     const { status = "pending", limit = 20, offset = 0 } = request.query as {
       status?: "pending" | "resolved" | "dismissed";
       limit?: number;
@@ -345,7 +424,9 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
   // Spec: Admin deve poder aplicar punições e registrar resolução
   // =====================================================
 
-  fastify.put("/reports/:id/resolve", async (request, reply: FastifyReply) => {
+  fastify.put("/reports/:id/resolve", {
+    preHandler: [requirePermission("reports.resolve")]
+  }, async (request, reply: FastifyReply) => {
     const { id } = request.params as { id: string };
     const { action, resolutionNote } = request.body as {
       action: "resolved" | "dismissed";
@@ -386,7 +467,9 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
   // Seção 6.2: KPIs (MRR, Churn, Conversão, etc.)
   // =====================================================
 
-  fastify.get("/analytics", async (request, reply: FastifyReply) => {
+  fastify.get("/analytics", {
+    preHandler: [requirePermission("finance.view")]
+  }, async (request, reply: FastifyReply) => {
     try {
       // Novos usuários nos últimos 30 dias
       const newUsersResult = await db.execute(sql`
@@ -446,7 +529,9 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
   // 9. ALIASES: /approve e /ban (Spec: PUT /admin/users/:id/approve + ban)
   // =====================================================
 
-  fastify.put("/users/:id/approve", async (request, reply: FastifyReply) => {
+  fastify.put("/users/:id/approve", {
+    preHandler: [requirePermission("users.edit")]
+  }, async (request, reply: FastifyReply) => {
     const { id } = request.params as { id: string };
     const adminUser = request.user as any;
     try {
@@ -465,7 +550,9 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
     }
   });
 
-  fastify.put("/users/:id/ban", async (request, reply: FastifyReply) => {
+  fastify.put("/users/:id/ban", {
+    preHandler: [requirePermission("users.ban")]
+  }, async (request, reply: FastifyReply) => {
     const { id } = request.params as { id: string };
     const adminUser = request.user as any;
     try {
