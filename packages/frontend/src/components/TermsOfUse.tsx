@@ -58,10 +58,19 @@ const TermsOfUse: React.FC = () => {
               Podemos suspender ou encerrar sua conta a qualquer momento, por qualquer motivo, incluindo, sem limitação, a violação destes Termos. Você pode encerrar sua conta a qualquer momento através das configurações do seu perfil.
             </p>
           </div>
-           <div>
-            <h3 className="text-2xl font-semibold font-display mb-3">8. Isenção de Garantias e Limitação de Responsabilidade</h3>
-            <p>
-              A Plataforma é fornecida "como está". Não garantimos a precisão, segurança ou confiabilidade da Plataforma ou de seu conteúdo. Não somos responsáveis por qualquer dano direto ou indireto resultante do uso da Plataforma. Encontros e interações com outros usuários são de sua exclusiva responsabilidade.
+          <div>
+            <h3 className="text-2xl font-semibold font-display mb-3 text-red-600 dark:text-red-400">8. Isenção de Garantias e Limitação de Responsabilidade Civil (Encontros Presenciais)</h3>
+            <p className="font-semibold text-gray-900 dark:text-gray-100 mb-2">
+              POR FAVOR, LEIA ESTA SEÇÃO COM ATENÇÃO. ELA DEFINE OS LIMITES DE NOSSA RESPONSABILIDADE LEGAL.
+            </p>
+            <p className="mb-4">
+              A Plataforma atua <strong>exclusivamente como um meio de aproximação e comunicação (matchmaking)</strong> entre usuários maiores de idade. Não prestamos serviços de agenciamento, investigação, segurança pessoal ou intermediação física.
+            </p>
+            <p className="mb-4">
+              <strong>Isenção em Encontros Presenciais:</strong> O Sweet Affinity, seus administradores, fundadores e funcionários não possuem qualquer controle sobre a conduta offline dos usuários. Portanto, <strong>não somos responsáveis por qualquer evento, incidente ou dano ocorrido em encontros físicos/presenciais</strong>. Isso inclui, sem limitação, agressões físicas ou verbais, violência de qualquer natureza, assédio, roubos, furtos, golpes financeiros, danos morais ou emocionais.
+            </p>
+            <p className="mb-4">
+              Qualquer encontro presencial agendado a partir das conexões feitas na Plataforma é de <strong>exclusiva escolha, risco e responsabilidade dos usuários envolvidos</strong>. Recomendamos fortemente que os usuários tomem medidas rigorosas de segurança pessoal, tais como: encontrar-se sempre em locais públicos, informar amigos/familiares sobre o local e horário do encontro, e nunca compartilhar dados bancários ou senhas.
             </p>
           </div>
         </div>

@@ -1,9 +1,10 @@
 'use client';
 import React, { useState } from 'react';
-import Hero from '../../components/Hero';
-import FeaturedProfiles from '../../components/FeaturedProfiles';
-import HowItWorks from '../../components/HowItWorks';
-import AuthModal from '../../components/AuthModal';
+import Hero from '../components/Hero';
+import FeaturedProfiles from '../components/FeaturedProfiles';
+import HowItWorks from '../components/HowItWorks';
+import SocialProof from '../components/SocialProof';
+import AuthModal from '../components/AuthModal';
 import { useRouter } from 'next/navigation';
 
 export default function HomePage() {
@@ -15,6 +16,7 @@ export default function HomePage() {
       <Hero onCtaClick={() => setIsAuthModalOpen(true)} />
       <FeaturedProfiles sectionTitle="Perfis em Destaque" profiles={[]} onProfileClick={() => setIsAuthModalOpen(true)} />
       <HowItWorks />
+      <SocialProof />
 
       {isAuthModalOpen && (
         <AuthModal 

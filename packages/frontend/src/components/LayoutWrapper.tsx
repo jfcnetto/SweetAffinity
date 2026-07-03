@@ -23,6 +23,20 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     router.push('/');
   };
 
+  // Escuta parâmetros de busca para abrir modal de login/registro de qualquer página
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const authAction = params.get('auth');
+    if (authAction === 'login' || authAction === 'register') {
+      setAuthMode(authAction);
+      setIsAuthModalOpen(true);
+      
+      // Limpa os parâmetros da URL sem recarregar
+      const newUrl = window.location.pathname + window.location.search.replace(/[?&]auth=[^&]+/, '');
+      window.history.replaceState({}, document.title, newUrl);
+    }
+  }, [pathname]); // Executa sempre que a rota mudar
+
   // Menu sub-nav apenas para logados e não no admin?
   const showSubNav = isAuthenticated && pathname !== '/admin';
 
@@ -88,7 +102,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
             if (user?.profileType === 'admin') router.push('/admin');
             else router.push('/feed');
           }}
-          navigateTo={(page) => console.log('Navigate to:', page)}
+          navigateTo={(page) => router.push(page)}
         />
       )}
     </div>

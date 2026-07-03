@@ -24,8 +24,24 @@ const Header: React.FC<HeaderProps> = ({
   return (
     <header className="bg-white/80 backdrop-blur-lg sticky top-0 z-50 shadow-sm">
       <div className="container mx-auto px-6 py-4 flex justify-between items-center">
-        <Link href={isAdminView ? "/admin" : "/"} className="text-3xl font-bold text-gray-800 font-display cursor-pointer">
-          Sweet Affinity
+        <Link href={isAdminView ? "/admin" : "/"} className="flex items-center space-x-2.5 group cursor-pointer">
+          {/* Logo Icon: Infinity Heart Container */}
+          <div className="relative w-9 h-9 flex items-center justify-center bg-gradient-to-tr from-gradient-pink to-gradient-orange rounded-xl shadow-sm group-hover:scale-105 transition-transform duration-300">
+            <svg 
+              className="w-5.5 h-5.5 text-white" 
+              viewBox="0 0 24 24" 
+              fill="currentColor" 
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              {/* Infinity-shaped heart representation */}
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            </svg>
+          </div>
+          {/* Logo Text */}
+          <span className="text-2xl font-bold tracking-tight">
+            <span className="text-slate-900 font-extrabold">Sweet</span>
+            <span className="bg-gradient-to-r from-gradient-pink to-gradient-orange bg-clip-text text-transparent ml-1 font-black">Affinity</span>
+          </span>
         </Link>
 
         <div className="flex items-center space-x-4 relative">

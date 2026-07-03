@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { MatchService, FeedProfile } from '../services/match.service.js';
+import { MatchService, FeedProfile } from '../services/match.service';
 import toast from 'react-hot-toast';
 import { Heart, X } from 'lucide-react';
 

@@ -1,4 +1,4 @@
-import { api } from "./api.js";
+import { api } from "./api";
 
 export interface FeedProfile {
   id: string;

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import type { Plan } from '../types';
-import { PaymentService } from '../services/payment.service.js';
+import { PaymentService } from '../services/payment.service';
 import toast from 'react-hot-toast';
-import { useAuth } from '../contexts/AuthContext.js';
+import { useAuth } from '../contexts/AuthContext';
 
 interface PaymentModalProps {
     plan: Plan;

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import toast from 'react-hot-toast';
-import { api } from '../services/api.js';
+import { api } from '../services/api';
 
 interface PhotoUploadProps {
   onComplete: () => void;

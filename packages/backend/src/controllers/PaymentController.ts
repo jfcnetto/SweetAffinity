@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { db } from "../db/index.js";
 import { users } from "../db/schema.js";
 import { eq } from "drizzle-orm";
+import { getSetting } from "./SiteSettingsController.js";
 
 // Instância do Stripe. Usando chave dummy fallback caso não configurada.
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_dummy_123", {
@@ -10,6 +11,24 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_dummy_123", 
 });
 
 export async function paymentRoutes(app: FastifyInstance) {
+  // =====================================================
+  // GET /api/payment/prices — Rota pública para ler os preços vigentes configurados no Admin
+  // =====================================================
+  app.get("/api/payment/prices", async (_req, reply: FastifyReply) => {
+    try {
+      const premiumPrice = await getSetting<number>("premium_price_cents");
+      const diamantePrice = await getSetting<number>("diamante_price_cents");
+      
+      return reply.send({
+        premium: premiumPrice, // Em centavos (ex: 29900 = R$ 299,00)
+        diamante: diamantePrice // Em centavos (ex: 49900 = R$ 499,00)
+      });
+    } catch (error) {
+      app.log.error(error);
+      return reply.status(500).send({ message: "Erro ao buscar preços ativos." });
+    }
+  });
+
   // Autenticação obrigatória para as rotas a seguir
   app.addHook("onRequest", async (req, reply) => {
     try {
@@ -31,8 +50,10 @@ export async function paymentRoutes(app: FastifyInstance) {
         return reply.status(400).send({ message: "Plano inválido." });
       }
 
-      // Preços simulados em centavos (ex: 9900 = R$ 99,00)
-      const amount = planId === "premium" ? 9900 : 14900; 
+      // Preço em centavos dinâmico do banco (site settings)
+      const premiumPrice = await getSetting<number>("premium_price_cents");
+      const diamantePrice = await getSetting<number>("diamante_price_cents");
+      const amount = planId === "premium" ? premiumPrice : diamantePrice;
 
       // Cria a intenção de pagamento no Stripe
       const paymentIntent = await stripe.paymentIntents.create({

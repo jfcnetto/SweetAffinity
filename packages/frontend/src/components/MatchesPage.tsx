@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { MatchService, MatchListProfile } from '../services/match.service.js';
+import { MatchService, MatchListProfile } from '../services/match.service';
 import toast from 'react-hot-toast';
-import MessageModal from './MessageModal.js';
-import { useAuth } from '../contexts/AuthContext.js';
+import MessageModal from './MessageModal';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function MatchesPage() {
   const [matches, setMatches] = useState<MatchListProfile[]>([]);

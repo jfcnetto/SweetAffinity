@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { api } from '../services/api.js';
-import { useAuth } from '../contexts/AuthContext.js';
+import { api } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
 interface AuthModalProps {
   onClose: () => void;
@@ -417,10 +417,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, initialMode, onRegistrat
                 </FormField>
             </FormSection>
           <div className="pt-4">
-            <div className="flex items-center">
-                <input id="terms" name="terms" type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="h-4 w-4 text-gradient-pink focus:ring-gradient-pink border-gray-300 rounded" />
-                <label htmlFor="terms" className="ml-2 block text-sm text-gray-900">
-                Eu li, concordo com os <button type="button" onClick={() => { onClose(); navigateTo('terms'); }} className="font-medium text-gradient-pink hover:text-gradient-orange underline">Termos de Uso</button> e confirmo que tenho 18 anos ou mais.
+            <div className="flex items-start">
+                <input id="terms" name="terms" type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="mt-1 h-4 w-4 text-gradient-pink focus:ring-gradient-pink border-gray-300 rounded" />
+                <label htmlFor="terms" className="ml-2 block text-xs text-gray-600 leading-normal">
+                  Eu li, concordo com os <button type="button" onClick={() => { onClose(); navigateTo('/terms'); }} className="font-semibold text-gradient-pink hover:text-gradient-orange underline">Termos de Uso</button>, a <button type="button" onClick={() => { onClose(); navigateTo('/privacy'); }} className="font-semibold text-gradient-pink hover:text-gradient-orange underline">Política de Privacidade</button> e confirmo que tenho 18 anos ou mais, declarando estar ciente de que a plataforma atua estritamente como meio de aproximação online, <strong>isentando-se de qualquer responsabilidade por atos, incidentes ou danos ocorridos em encontros presenciais offline</strong>.
                 </label>
             </div>
             {registerError && <p className="text-red-500 text-sm text-center bg-red-50 p-3 rounded-lg mt-4">{registerError}</p>}
