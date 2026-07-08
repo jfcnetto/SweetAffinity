@@ -9,7 +9,7 @@ import { useRouter, usePathname } from 'next/navigation';
 export default function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const { isAuthenticated, logout, user } = useAuth();
+  const { isAuthenticated, logout, user, isLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -37,6 +37,23 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     }
   }, [pathname]); // Executa sempre que a rota mudar
 
+  // Redireciona usuários logados com pendências no cadastro (Primeiro Fotos, depois Perfil)
+  React.useEffect(() => {
+    const isPublicPage = ['/about', '/faq', '/terms', '/privacy', '/security', '/plans'].includes(pathname);
+    
+    if (!isLoading && isAuthenticated && user && !isPublicPage && pathname !== '/admin') {
+      if (user.hasPhotos === false) {
+        if (pathname !== '/register/photos') {
+          router.push('/register/photos');
+        }
+      } else if (user.hasCompletedProfile === false) {
+        if (pathname !== '/register/profile') {
+          router.push('/register/profile');
+        }
+      }
+    }
+  }, [isLoading, isAuthenticated, user, pathname, router]);
+
   // Menu sub-nav apenas para logados e não no admin?
   const showSubNav = isAuthenticated && pathname !== '/admin';
 
@@ -50,13 +67,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
       />
       
       {showSubNav && (
-        <div className="bg-white border-b border-gray-200 py-3 shadow-sm flex justify-center gap-6">
-           <button 
-             onClick={() => router.push('/feed')} 
-             className={`font-semibold ${pathname === '/feed' ? 'text-gradient-pink border-b-2 border-gradient-pink pb-1' : 'text-gray-500 hover:text-gray-700'}`}
-           >
-             🔥 Feed
-           </button>
+         <div className="bg-white border-b border-gray-200 py-3 shadow-sm flex justify-center gap-6">
            <button 
              onClick={() => router.push('/matches')} 
              className={`font-semibold ${pathname === '/matches' ? 'text-gradient-pink border-b-2 border-gradient-pink pb-1' : 'text-gray-500 hover:text-gray-700'}`}
@@ -96,11 +107,19 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
         <AuthModal 
           onClose={() => setIsAuthModalOpen(false)} 
           initialMode={authMode} 
-          onRegistrationComplete={() => setIsAuthModalOpen(false)}
-          onLoginSuccess={() => {
+          onRegistrationComplete={() => {
             setIsAuthModalOpen(false);
-            if (user?.profileType === 'admin') router.push('/admin');
-            else router.push('/feed');
+            router.push('/register/photos');
+          }}
+          onLoginSuccess={(loggedUser) => {
+            setIsAuthModalOpen(false);
+            if (loggedUser?.profileType === 'admin') {
+              router.push('/admin');
+            } else if (!loggedUser?.hasPhotos) {
+              router.push('/register/photos');
+            } else {
+              router.push('/');
+            }
           }}
           navigateTo={(page) => router.push(page)}
         />

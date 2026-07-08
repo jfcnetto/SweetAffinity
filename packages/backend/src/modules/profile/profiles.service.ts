@@ -1,5 +1,5 @@
 import { db } from "../../db/index.js";
-import { profiles } from "../../db/schema.js";
+import { profiles, users } from "../../db/schema.js";
 import { eq } from "drizzle-orm";
 import axios from "axios";
 import { redis } from "../../plugins/redis.js";
@@ -25,14 +25,27 @@ export const ProfileService = {
       }
     }
 
+    // Busca o status do usuário para saber se ele ainda está na fase de onboarding
+    const [userRecord] = await db.select({ status: users.status }).from(users).where(eq(users.id, userId));
+    const isPending = userRecord?.status === "pending";
+
     if (existing) {
-      // RN-003: relationshipType é imutável — remove do update
-      const { relationshipType, id, createdAt, popularityScore, profileViews, deletedAt, ...updateData } = data;
+      // RN-003: relationshipType é imutável após onboarding concluído
+      const { id, createdAt, popularityScore, profileViews, deletedAt, ...updateData } = data;
+      
+      if (!isPending) {
+        delete updateData.relationshipType;
+      }
+
       const [updated] = await db
         .update(profiles)
         .set({ ...updateData, updatedAt: new Date() })
         .where(eq(profiles.id, userId))
         .returning();
+
+      // Ativa o usuário no sistema (para aparecer no feed)
+      await db.update(users).set({ status: "active" }).where(eq(users.id, userId));
+
       return [updated];
     }
 
@@ -48,6 +61,10 @@ export const ProfileService = {
       .insert(profiles)
       .values({ id: userId, ...data })
       .returning();
+
+    // Ativa o usuário no sistema (para aparecer no feed)
+    await db.update(users).set({ status: "active" }).where(eq(users.id, userId));
+
     return [created];
   },
 

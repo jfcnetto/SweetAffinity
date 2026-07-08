@@ -7,7 +7,7 @@ interface AuthModalProps {
   onClose: () => void;
   initialMode: 'login' | 'register';
   onRegistrationComplete: (profileType: 'Baby' | 'Daddy' | 'Mommy') => void;
-  onLoginSuccess: () => void;
+  onLoginSuccess: (user: any) => void;
   navigateTo: (page: string) => void;
 }
 
@@ -80,6 +80,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, initialMode, onRegistrat
     const [termsAccepted, setTermsAccepted] = useState(false);
     const [isCompletingGoogleSignUp, setIsCompletingGoogleSignUp] = useState(false);
     const [registerError, setRegisterError] = useState('');
+    const [registeredEmail, setRegisteredEmail] = useState('');
 
     // Login state
     const [loginEmail, setLoginEmail] = useState('');
@@ -184,14 +185,19 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, initialMode, onRegistrat
 
         try {
             const response = await api.post('/auth/register', payload);
-            
             const data = response.data;
-            if (data.accessToken && data.refreshToken) {
-                login(data.accessToken, data.refreshToken);
-            }
             
-            toast.success('Cadastro realizado com sucesso!');
-            onRegistrationComplete(profileType);
+            if (data.message === 'VERIFICATION_EMAIL_SENT') {
+                setRegisteredEmail(email);
+                setMode('verify_sent' as any);
+                toast.success('E-mail de confirmação enviado! Verifique seu e-mail.');
+            } else {
+                if (data.accessToken && data.refreshToken) {
+                    login(data.accessToken, data.refreshToken);
+                }
+                toast.success('Cadastro realizado com sucesso!');
+                onRegistrationComplete(profileType);
+            }
         } catch (error: any) {
             const msg = error.response?.data?.message || 'Erro de conexão com o servidor.';
             setRegisterError(msg);
@@ -214,11 +220,17 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, initialMode, onRegistrat
             
             login(data.accessToken, data.refreshToken);
             toast.success('Bem-vindo de volta!');
-            onLoginSuccess();
+            onLoginSuccess(data.user);
         } catch (error: any) {
             const msg = error.response?.data?.message || 'Erro ao conectar à API.';
-            setLoginError(msg);
-            toast.error(msg);
+            if (msg === 'EMAIL_NOT_VERIFIED') {
+                setRegisteredEmail(loginEmail);
+                setMode('verify_sent' as any);
+                toast.error('E-mail não verificado. Verifique seu e-mail para prosseguir.');
+            } else {
+                setLoginError(msg);
+                toast.error(msg);
+            }
         }
     };
     
@@ -420,7 +432,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, initialMode, onRegistrat
             <div className="flex items-start">
                 <input id="terms" name="terms" type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="mt-1 h-4 w-4 text-gradient-pink focus:ring-gradient-pink border-gray-300 rounded" />
                 <label htmlFor="terms" className="ml-2 block text-xs text-gray-600 leading-normal">
-                  Eu li, concordo com os <button type="button" onClick={() => { onClose(); navigateTo('/terms'); }} className="font-semibold text-gradient-pink hover:text-gradient-orange underline">Termos de Uso</button>, a <button type="button" onClick={() => { onClose(); navigateTo('/privacy'); }} className="font-semibold text-gradient-pink hover:text-gradient-orange underline">Política de Privacidade</button> e confirmo que tenho 18 anos ou mais, declarando estar ciente de que a plataforma atua estritamente como meio de aproximação online, <strong>isentando-se de qualquer responsabilidade por atos, incidentes ou danos ocorridos em encontros presenciais offline</strong>.
+                  Eu li, concordo com os <a href="/terms" target="_blank" rel="noopener noreferrer" className="font-semibold text-gradient-pink hover:text-gradient-orange underline">Termos de Uso</a>, a <a href="/privacy" target="_blank" rel="noopener noreferrer" className="font-semibold text-gradient-pink hover:text-gradient-orange underline">Política de Privacidade</a> e confirmo que tenho 18 anos ou mais, declarando estar ciente de que a plataforma atua estritamente como meio de aproximação online, <strong>isentando-se de qualquer responsabilidade por atos, incidentes ou danos ocorridos em encontros presenciais offline</strong>.
                 </label>
             </div>
             {registerError && <p className="text-red-500 text-sm text-center bg-red-50 p-3 rounded-lg mt-4">{registerError}</p>}
@@ -433,10 +445,35 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, initialMode, onRegistrat
             </button>
           </div>
         </form>
-         <p className="text-center text-sm text-gray-600 mt-6">
+          <p className="text-center text-sm text-gray-600 mt-6">
               Já tem uma conta? <button onClick={() => setMode('login')} className="font-medium text-gradient-pink hover:text-gradient-orange">Entrar</button>
             </p>
         </>
+    );
+
+    const renderVerifySent = () => (
+        <div className="text-center py-6">
+            <div className="w-16 h-16 bg-pink-50 text-gradient-pink rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-pink-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 19v-8.93a2 2 0 01.89-1.664l8-5.333a2 2 0 012.22 0l8 5.333A2 2 0 0121 10.07V19M3 19a2 2 0 002 2h14a2 2 0 002-2M3 19l6.75-4.5M21 19l-6.75-4.5M3 10l6.75 4.5M21 10l-6.75 4.5m0 0l-2.25-1.5a2 2 0 00-2.22 0l-2.25 1.5" />
+                </svg>
+            </div>
+            <h2 className="text-3xl font-bold mb-4 font-display text-gray-800">Verifique seu E-mail</h2>
+            <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                Enviamos um e-mail de confirmação para <strong className="text-gray-800">{registeredEmail}</strong>.<br />
+                Por favor, clique no link contido no e-mail para verificar seu endereço e prosseguir com o envio das fotos.
+            </p>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-xs text-amber-800 text-left max-w-md mx-auto mb-6">
+                <p className="font-semibold mb-1">💡 Dica do Desenvolvedor:</p>
+                Como o projeto está rodando localmente, o link de confirmação também foi impresso no <strong>terminal do seu backend</strong>! Basta copiá-lo e colá-lo no navegador para simular a verificação.
+            </div>
+            <button 
+                onClick={() => setMode('login')} 
+                className="px-6 py-2.5 bg-gradient-to-r from-gradient-pink to-gradient-orange text-white rounded-full font-semibold hover:opacity-90 transition-all shadow-md"
+            >
+                Voltar para o Login
+            </button>
+        </div>
     );
 
   return (
@@ -447,7 +484,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, initialMode, onRegistrat
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
-        {mode === 'login' ? renderLogin() : renderRegister()}
+        {mode === 'login' ? renderLogin() : mode === 'register' ? renderRegister() : renderVerifySent()}
       </div>
     </div>
   );

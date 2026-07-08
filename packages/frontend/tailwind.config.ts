@@ -10,9 +10,9 @@ const config: Config = {
     extend: {
       colors: {
         'vibrant-orange': '#FF6B6B',
-        'intense-red': '#FD267D',
-        'gradient-pink': '#FF5864',
-        'gradient-orange': '#FD297B',
+        'intense-red': '#9E0810',
+        'gradient-pink': '#E30A17',
+        'gradient-orange': '#E30A17',
         'neutral-gray': '#F5F5F5',
         'dark-gray': '#424242',
       }

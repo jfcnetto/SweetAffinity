@@ -28,7 +28,7 @@ export default function ProfileDetailPage() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const token = localStorage.getItem('accessToken');
+        const token = localStorage.getItem('sweet_access_token');
         const { data } = await axios.get(`${API_URL}/profiles/${params.id}`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
@@ -47,7 +47,7 @@ export default function ProfileDetailPage() {
 
   const handleLike = async () => {
     try {
-      const token = localStorage.getItem('accessToken');
+      const token = localStorage.getItem('sweet_access_token');
       await axios.post(`${API_URL}/profiles/${params.id}/like`, {}, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -62,7 +62,7 @@ export default function ProfileDetailPage() {
     const reason = window.prompt('Motivo da denúncia (fake_profile, harassment, spam, underage, nudity, other):');
     if (!reason) return;
     try {
-      const token = localStorage.getItem('accessToken');
+      const token = localStorage.getItem('sweet_access_token');
       await axios.post(`${API_URL}/profiles/${params.id}/report`, { reason }, {
         headers: { Authorization: `Bearer ${token}` },
       });

@@ -7,7 +7,9 @@ const Footer: React.FC = () => {
       <div className="container mx-auto px-6 py-12">
         <div className="grid md:grid-cols-3 gap-8">
           <div>
-            <h3 className="text-2xl font-bold text-white font-display mb-4">Sweet Affinity</h3>
+            <h3 className="text-2xl font-bold text-white font-display mb-4">
+              <Link href="/" className="hover:opacity-90 transition-opacity">Sweet Affinity</Link>
+            </h3>
             <p className="pr-8">A plataforma líder no Brasil para relacionamentos Sugar autênticos e seguros.</p>
           </div>
           <div>

@@ -11,18 +11,23 @@ interface FeaturedProfilesProps {
 const FeaturedProfiles: React.FC<FeaturedProfilesProps> = ({ sectionTitle, profiles, onProfileClick }) => {
   const [activeTab, setActiveTab] = useState('destaques');
   // Alterado para string[] porque agora usamos UUIDs (strings) do nosso banco local
-  const [favoritedProfiles, setFavoritedProfiles] = useState<string[]>(() => {
-    try {
-        const saved = localStorage.getItem('favoritedProfiles');
-        return saved ? JSON.parse(saved) : [];
-    } catch (error) {
-        console.error("Failed to parse favorites from localStorage", error);
-        return [];
-    }
-  });
+  const [favoritedProfiles, setFavoritedProfiles] = useState<string[]>([]);
 
   useEffect(() => {
-    localStorage.setItem('favoritedProfiles', JSON.stringify(favoritedProfiles));
+    try {
+      const saved = localStorage.getItem('favoritedProfiles');
+      if (saved) {
+        setFavoritedProfiles(JSON.parse(saved));
+      }
+    } catch (error) {
+      console.error("Failed to parse favorites from localStorage", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (favoritedProfiles.length > 0) {
+      localStorage.setItem('favoritedProfiles', JSON.stringify(favoritedProfiles));
+    }
   }, [favoritedProfiles]);
 
   const handleToggleFavorite = (profileId: string) => {

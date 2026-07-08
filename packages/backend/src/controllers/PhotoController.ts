@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand, HeadBucketCommand, CreateBucketCommand } from "@aws-sdk/client-s3";
 import { randomUUID } from "crypto";
 import sharp from "sharp";
 
@@ -22,18 +22,33 @@ const s3Client = new S3Client({
 });
 
 const BUCKET_NAME =
-  process.env.MINIO_BUCKET_NAME || "sweet-photos";
+  process.env.MINIO_BUCKET_NAME || "sweetaffinity-media";
 
 const MINIO_URL =
   process.env.MINIO_PUBLIC_URL ||
-  "http://localhost:9000/sweet-photos";
+  "http://localhost:9000/sweetaffinity-media";
 
 // =====================================================
 // PHOTO ROUTES
 // =====================================================
 
 export const photoRoutes = async (fastify: FastifyInstance) => {
-  // multipart já registrado globalmente em index.ts (10MB limit — RN-015)
+  // Garante a existência do bucket no MinIO local de forma auto-regenerativa no startup
+  try {
+    await s3Client.send(new HeadBucketCommand({ Bucket: BUCKET_NAME }));
+  } catch (err: any) {
+    if (err.name === "NotFound" || err.$metadata?.httpStatusCode === 404 || err.name === "NoSuchBucket") {
+      fastify.log.info(`Aviso: O bucket "${BUCKET_NAME}" não existe. Criando agora no MinIO local...`);
+      try {
+        await s3Client.send(new CreateBucketCommand({ Bucket: BUCKET_NAME }));
+        fastify.log.info(`Sucesso: Bucket "${BUCKET_NAME}" criado.`);
+      } catch (createErr) {
+        fastify.log.error(`Erro crítico ao tentar criar o bucket "${BUCKET_NAME}":`, createErr);
+      }
+    } else {
+      fastify.log.error(`Erro ao verificar a saúde do bucket "${BUCKET_NAME}":`, err);
+    }
+  }
 
   // =====================================================
   // UPLOAD PHOTO

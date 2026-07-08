@@ -9,7 +9,7 @@ dotenv.config({
   path: path.resolve(__dirname, "../.env"),
 });
 
-// fallback raiz
+// fallback raiz (três níveis acima de packages/backend/src)
 dotenv.config({
-  path: path.resolve(__dirname, "../../.env"),
+  path: path.resolve(__dirname, "../../../.env"),
 });

@@ -1,9 +1,10 @@
 import { AuthService } from "./auth.service.js";
 import { authGuard } from "./auth.guard.js";
 import { db } from "../../db/index.js";
-import { users } from "../../db/schema.js";
+import { users, photos, profiles, notifications } from "../../db/schema.js";
 import { eq } from "drizzle-orm";
 import axios from "axios";
+import { EmailService } from "../../services/EmailService.js";
 
 export async function authRoutes(app: any) {
 
@@ -11,7 +12,7 @@ export async function authRoutes(app: any) {
   // POST /auth/register
   // =====================================================
   app.post("/auth/register", async (req: any, reply: any) => {
-    const { email, password } = req.body ?? {};
+    const { email, password, ...profileFields } = req.body ?? {};
 
     if (!email || !password) {
       return reply.status(400).send({ message: "E-mail e senha são obrigatórios." });
@@ -23,16 +24,111 @@ export async function authRoutes(app: any) {
 
     try {
       const user = await AuthService.register(email, password);
-      const accessToken = AuthService.generateAccessToken(app, user);
-      const refreshToken = await AuthService.generateRefreshToken(user.id);
 
-      return reply.status(201).send({ user, accessToken, refreshToken });
+      // Mapeamento correto para o Enum de Tipo de Relacionamento do banco
+      const profileTypeMap: { [key: string]: 'baby' | 'daddy' | 'mommy' } = {
+        'Baby': 'baby',
+        'Daddy': 'daddy',
+        'Mommy': 'mommy',
+      };
+      
+      const relationshipType = profileTypeMap[profileFields.profile_type] || 'baby';
+
+      // Cria a linha correspondente do perfil (RN-001) para que o feed não dê 404
+      await db.insert(profiles).values({
+        id: user.id,
+        displayName: profileFields.display_name || email.split('@')[0],
+        birthDate: profileFields.birth_date || "2000-01-01",
+        relationshipType,
+        gender: profileFields.gender || "other",
+        state: profileFields.state || null,
+        city: profileFields.city || null,
+        profession: profileFields.profession || null,
+        education: profileFields.education || null,
+        incomeRange: profileFields.income_range || null,
+        maritalStatus: profileFields.marital_status ? profileFields.marital_status.toLowerCase() : null,
+        heightRange: profileFields.height_range || null,
+        ethnicity: profileFields.ethnicity || null,
+        hairColor: profileFields.hair_color || null,
+        eyeColor: profileFields.eye_color || null,
+        smoking: profileFields.smoking ? profileFields.smoking.toLowerCase() : null,
+        drinking: profileFields.drinking ? profileFields.drinking.toLowerCase() : null,
+      });
+
+      // Cria notificação de boas-vindas
+      await db.insert(notifications).values({
+        userId: user.id,
+        type: "system",
+        title: "✨ Bem-vindo!",
+        body: "Complete seu perfil adicionando suas fotos para conseguir matches.",
+        link: "/register/photos",
+      });
+
+      // Gera token de verificação por e-mail (expira em 24h)
+      const verificationToken = app.jwt.sign(
+        { sub: user.id, type: "verification" },
+        { expiresIn: "24h" }
+      );
+
+      // Envia o e-mail
+      await EmailService.sendVerificationEmail(email.toLowerCase().trim(), verificationToken);
+
+      return reply.status(201).send({
+        message: "VERIFICATION_EMAIL_SENT",
+        email: email.toLowerCase().trim()
+      });
 
     } catch (err: any) {
       if (err.message === "EMAIL_ALREADY_EXISTS") {
         return reply.status(409).send({ message: "E-mail já cadastrado." });
       }
       throw err; // outros erros viram 500 pelo Fastify
+    }
+  });
+
+  // =====================================================
+  // GET /auth/verify — Confirmação de e-mail por Token
+  // =====================================================
+  app.get("/auth/verify", async (req: any, reply: any) => {
+    const { token } = req.query ?? {};
+
+    if (!token) {
+      return reply.status(400).send({ message: "Token de verificação ausente." });
+    }
+
+    try {
+      const payload = app.jwt.verify(token) as { sub: string; type: string };
+
+      if (payload.type !== "verification") {
+        return reply.status(400).send({ message: "Token inválido." });
+      }
+
+      const userId = payload.sub;
+
+      const [updatedUser] = await db
+        .update(users)
+        .set({ isVerified: true })
+        .where(eq(users.id, userId))
+        .returning();
+
+      if (!updatedUser) {
+        return reply.status(404).send({ message: "Usuário não encontrado." });
+      }
+
+      // Gera os tokens de login reais após verificação
+      const accessToken = AuthService.generateAccessToken(app, updatedUser);
+      const refreshToken = await AuthService.generateRefreshToken(updatedUser.id);
+
+      return reply.send({
+        success: true,
+        user: updatedUser,
+        accessToken,
+        refreshToken
+      });
+
+    } catch (err) {
+      app.log.error(err);
+      return reply.status(400).send({ message: "Token de verificação inválido ou expirado." });
     }
   });
 
@@ -48,10 +144,51 @@ export async function authRoutes(app: any) {
 
     try {
       const user = await AuthService.login(email, password);
+
+      if (!user.isVerified) {
+        return reply.status(403).send({
+          message: "EMAIL_NOT_VERIFIED",
+          email: user.email
+        });
+      }
+
       const accessToken = AuthService.generateAccessToken(app, user);
       const refreshToken = await AuthService.generateRefreshToken(user.id);
 
-      return reply.send({ user, accessToken, refreshToken });
+      // Auto-create profile if missing (self-healing for old test accounts)
+      const [profile] = await db
+        .select()
+        .from(profiles)
+        .where(eq(profiles.id, user.id))
+        .limit(1);
+        
+      if (!profile) {
+        await db.insert(profiles).values({
+          id: user.id,
+          displayName: user.email.split('@')[0],
+          birthDate: "2000-01-01",
+          relationshipType: "baby",
+        });
+      }
+
+      // Verifica se o usuário já tem fotos enviadas
+      const userPhotos = await db
+        .select({ id: photos.id })
+        .from(photos)
+        .where(eq(photos.userId, user.id))
+        .limit(1);
+      const hasPhotos = userPhotos.length > 0;
+
+      // Verifica se o cadastro está completo (se tem cidade e estado preenchidos)
+      const hasCompletedProfile = profile && profile.city !== null && profile.state !== null;
+
+
+
+      return reply.send({ 
+        user: { ...user, hasPhotos, hasCompletedProfile }, 
+        accessToken, 
+        refreshToken 
+      });
 
     } catch (err: any) {
       if (err.message === "INVALID_CREDENTIALS") {
@@ -165,6 +302,34 @@ export async function authRoutes(app: any) {
       return reply.status(404).send({ message: "Usuário não encontrado." });
     }
 
-    return reply.send({ user: result[0] });
+    // Auto-create profile if missing (self-healing for old test accounts)
+    let [profile] = await db
+      .select()
+      .from(profiles)
+      .where(eq(profiles.id, req.user.sub))
+      .limit(1);
+      
+    if (!profile) {
+      const [newProfile] = await db.insert(profiles).values({
+        id: req.user.sub,
+        displayName: result[0].email.split('@')[0],
+        birthDate: "2000-01-01",
+        relationshipType: "baby",
+      }).returning();
+      profile = newProfile;
+    }
+
+    // Verifica se o usuário tem fotos
+    const userPhotos = await db
+      .select({ id: photos.id })
+      .from(photos)
+      .where(eq(photos.userId, req.user.sub))
+      .limit(1);
+    const hasPhotos = userPhotos.length > 0;
+
+    // Verifica se o cadastro está completo (se tem cidade e estado preenchidos)
+    const hasCompletedProfile = profile && profile.city !== null && profile.state !== null;
+
+    return reply.send({ user: { ...result[0], hasPhotos, hasCompletedProfile } });
   });
 }

@@ -1,5 +1,5 @@
 import { db } from "../../db/index.js";
-import { users, refreshTokens } from "../../db/schema.js";
+import { users, refreshTokens, profiles } from "../../db/schema.js";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
@@ -110,11 +110,18 @@ export class AuthService {
         .values({
           email: cleanEmail,
           passwordHash,
-          // name // O Drizzle Schema atual talvez não tenha display_name logo de cara.
-          // Iremos apenas criar o user por enquanto. O usuário deve completar o onboarding.
+          isVerified: true, // Google logins are pre-verified
         })
         .returning();
       
+      // Cria perfil básico padrão no Google Login (RN-001) para evitar quebras de banco
+      await db.insert(profiles).values({
+        id: newUser.id,
+        displayName: displayName || cleanEmail.split('@')[0],
+        birthDate: "2000-01-01",
+        relationshipType: "baby", // valor padrão
+      });
+
       user = newUser;
     } else {
       if (user.status === "banned" || user.status === "suspended") {

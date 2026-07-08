@@ -318,53 +318,6 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
   });
 
   // =====================================================
-  // 5. DASHBOARD FINANCEIRO E KPIS
-  // Spec: GET /admin/financial + GET /admin/analytics
-  // =====================================================
-
-  fastify.get("/dashboard", async (request, reply) => {
-    try {
-      // 1. Contagem de usuários ativos
-      const usersResult = await db.execute(sql`SELECT count(*) FROM users WHERE status = 'active'`);
-      const totalActiveUsers = usersResult.rows[0].count;
-
-      // 2. Cálculo do MRR (Mensal Recorrente) e Assinaturas Ativas
-      const subsResult = await db.execute(sql`
-        SELECT count(*) as active_subs, sum(amount) as mrr_cents 
-        FROM subscriptions 
-        WHERE status = 'active'
-      `);
-      const activeSubs = subsResult.rows[0].active_subs;
-      const mrr = subsResult.rows[0].mrr_cents ? Number(subsResult.rows[0].mrr_cents) / 100 : 0;
-
-      // ARR (Annual Recurring Revenue)
-      const arr = mrr * 12;
-
-      // 3. Contagem de Matches (Engajamento)
-      const matchesResult = await db.execute(sql`SELECT count(*) FROM matches`);
-      const totalMatches = matchesResult.rows[0].count;
-
-      // 4. Total de denúncias pendentes
-      const reportsResult = await db.execute(sql`SELECT count(*) FROM reports WHERE status = 'pending'`);
-      const pendingReports = reportsResult.rows[0].count;
-
-      return reply.send({
-        totalActiveUsers: Number(totalActiveUsers),
-        activeSubscriptions: Number(activeSubs),
-        mrr,
-        arr,
-        totalMatches: Number(totalMatches),
-        pendingReports: Number(pendingReports),
-      });
-    } catch (error) {
-      fastify.log.error(error);
-      return reply.status(500).send({
-        message: "Erro ao gerar KPIs do Dashboard.",
-      });
-    }
-  });
-
-  // =====================================================
   // 6. RELATÓRIO DE DENÚNCIAS (REPORTS)
   // Spec: GET /admin/reports — Admin JWT Token
   // Seção 6.1: Central de denúncias categorizadas por gravidade e cronologia

@@ -3,13 +3,18 @@ import { db } from "../db/index.js";
 import { notifications } from "../db/schema.js";
 import { eq, desc } from "drizzle-orm";
 export async function notificationRoutes(server: FastifyInstance) {
+  // Autenticação obrigatória para todas as rotas de notificações
+  server.addHook("onRequest", async (request, reply) => {
+    try {
+      await request.jwtVerify();
+    } catch (err) {
+      reply.status(401).send({ error: "Não autorizado." });
+    }
+  });
+
   // Obter notificações do usuário
   server.get("/", async (request, reply) => {
     const user = request.user as { sub: string };
-    
-    if (!user) {
-      return reply.status(401).send({ error: "Unauthorized" });
-    }
 
     try {
       const userNotifications = await db
@@ -30,10 +35,6 @@ export async function notificationRoutes(server: FastifyInstance) {
   server.put("/:id/read", async (request, reply) => {
     const user = request.user as { sub: string };
     const { id } = request.params as { id: string };
-
-    if (!user) {
-      return reply.status(401).send({ error: "Unauthorized" });
-    }
 
     try {
       await db

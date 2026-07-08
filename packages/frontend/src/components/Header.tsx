@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { api } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
 interface HeaderProps {
   onLoginClick: () => void;
@@ -17,9 +20,58 @@ const Header: React.FC<HeaderProps> = ({
   isAdminView = false 
 }) => {
   const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const { user } = useAuth();
+  const router = useRouter();
 
-  // Mock de notificações. Depois integraremos via API
-  const unreadCount = 2;
+  // Busca notificações reais do banco de dados
+  const fetchNotifications = async () => {
+    if (!isAuthenticated) return;
+    try {
+      const response = await api.get('/notifications');
+      const data = response.data;
+      setNotifications(data);
+      setUnreadCount(data.filter((n: any) => !n.isRead).length);
+    } catch (error) {
+      console.error("Erro ao carregar notificações reais:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchNotifications();
+      // Polling leve a cada 30 segundos para manter notificações atualizadas
+      const interval = setInterval(fetchNotifications, 30000);
+      return () => clearInterval(interval);
+    } else {
+      setNotifications([]);
+      setUnreadCount(0);
+    }
+  }, [isAuthenticated]);
+
+  const handleMarkAsRead = async (id: string, link: string | null) => {
+    try {
+      await api.put(`/notifications/${id}/read`);
+      // Atualiza estado local
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (error) {
+      console.error("Erro ao marcar notificação como lida:", error);
+    }
+
+    setShowNotifications(false);
+
+    if (link) {
+      // Se for a notificação de boas-vindas para completar cadastro
+      if (link === '/register/photos' && user?.hasPhotos) {
+        // Se ele já tem fotos, redireciona para a página de perfil
+        router.push(`/profiles/${user.id}`);
+      } else {
+        router.push(link);
+      }
+    }
+  };
 
   return (
     <header className="bg-white/80 backdrop-blur-lg sticky top-0 z-50 shadow-sm">
@@ -49,14 +101,17 @@ const Header: React.FC<HeaderProps> = ({
             <>
               {/* SINO DE NOTIFICAÇÕES */}
               <button 
-                onClick={() => setShowNotifications(!showNotifications)}
+                onClick={() => {
+                  setShowNotifications(!showNotifications);
+                  if (!showNotifications) fetchNotifications(); // Atualiza ao abrir
+                }}
                 className="relative text-gray-600 hover:text-intense-red transition-colors p-2"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
                 {unreadCount > 0 && (
-                  <span className="absolute top-1 right-1 bg-red-500 text-white text-xs font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                  <span className="absolute top-1 right-1 bg-red-500 text-white text-xs font-bold w-4 h-4 rounded-full flex items-center justify-center animate-pulse">
                     {unreadCount}
                   </span>
                 )}
@@ -64,21 +119,33 @@ const Header: React.FC<HeaderProps> = ({
 
               {/* MODAL DE NOTIFICAÇÕES */}
               {showNotifications && (
-                <div className="absolute top-12 right-12 w-80 bg-white border border-gray-200 shadow-xl rounded-lg overflow-hidden z-50">
-                  <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 font-semibold text-gray-700">
-                    Notificações
+                <div className="absolute top-12 right-0 w-80 bg-white border border-gray-200 shadow-2xl rounded-xl overflow-hidden z-50 animate-fade-in">
+                  <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 font-bold text-gray-700 text-sm flex justify-between items-center">
+                    <span>Notificações</span>
+                    {unreadCount > 0 && <span className="text-xs bg-pink-100 text-pink-600 px-2 py-0.5 rounded-full">{unreadCount} novas</span>}
                   </div>
-                  <div className="max-h-64 overflow-y-auto">
-                    <div className="p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer bg-pink-50">
-                      <p className="text-sm font-semibold text-gray-800">💖 Novo Match!</p>
-                      <p className="text-xs text-gray-600">Você e Clara curtiram os perfis um do outro.</p>
-                      <p className="text-xs text-gray-400 mt-1">Há 5 minutos</p>
-                    </div>
-                    <div className="p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer">
-                      <p className="text-sm font-semibold text-gray-800">✨ Bem-vindo!</p>
-                      <p className="text-xs text-gray-600">Complete seu perfil para conseguir mais matches.</p>
-                      <p className="text-xs text-gray-400 mt-1">Há 2 dias</p>
-                    </div>
+                  <div className="max-h-64 overflow-y-auto divide-y divide-gray-100">
+                    {notifications.length > 0 ? (
+                      notifications.map((notif) => (
+                        <div 
+                          key={notif.id}
+                          onClick={() => handleMarkAsRead(notif.id, notif.link)}
+                          className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors ${!notif.isRead ? 'bg-pink-50/30' : ''}`}
+                        >
+                          <p className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
+                            {notif.type === 'match' ? '💖' : notif.type === 'system' ? '✨' : '✉️'} {notif.title}
+                          </p>
+                          <p className="text-xs text-gray-600 mt-1">{notif.body}</p>
+                          <p className="text-[10px] text-gray-400 mt-2">
+                            {new Date(notif.createdAt).toLocaleDateString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-8 text-center text-gray-400 text-sm">
+                        Nenhuma notificação por enquanto.
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
