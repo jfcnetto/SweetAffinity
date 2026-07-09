@@ -77,6 +77,29 @@ export default function AdminSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const [generating, setGenerating] = useState(false);
+
+  const handleGenerateBlogArticle = async () => {
+    setGenerating(true);
+    setError("");
+    try {
+      const res = await fetch(`${API}/blog/generate`, {
+        method: "POST",
+        headers: { 
+          Authorization: `Bearer ${token}` 
+        },
+      });
+      if (res.ok) {
+        alert("Sucesso! Um novo artigo foi gerado e salvo. Acesse a listagem do blog para visualizar o novo conteúdo gerado via IA Gemini!");
+      } else {
+        setError("Erro ao gerar artigo por IA");
+      }
+    } catch {
+      setError("Erro de rede ao conectar com a API");
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   const token = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
 
@@ -166,6 +189,14 @@ export default function AdminSettingsPage() {
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
+          </button>
+          <button
+            onClick={handleGenerateBlogArticle}
+            disabled={generating}
+            className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium rounded-xl bg-pink-650 hover:bg-pink-750 text-white disabled:opacity-50 transition-colors"
+          >
+            <RefreshCw className={`w-4 h-4 ${generating ? "animate-spin" : ""}`} />
+            {generating ? "Gerando Artigo..." : "Gerar Artigo por IA"}
           </button>
           <button
             onClick={handleSaveAll}

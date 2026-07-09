@@ -12,7 +12,8 @@ import {
   Menu, 
   X,
   Mail,
-  ShieldCheck
+  ShieldCheck,
+  Sparkles
 } from "lucide-react";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -27,6 +28,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: "Comunicações", href: "/admin/communications", icon: Mail },
     { name: "Acessos & Roles", href: "/admin/roles", icon: ShieldCheck },
     { name: "Configurações", href: "/admin/settings", icon: Settings },
+    { name: "Gerenciar Blog", href: "/admin/blog", icon: Sparkles },
   ];
 
   return (
@@ -71,12 +73,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href || (item.href !== "/admin" && pathname?.startsWith(item.href));
+              const isActive = item.href ? (pathname === item.href || (item.href !== "/admin" && pathname?.startsWith(item.href))) : false;
               
               return (
                 <Link
                   key={item.name}
-                  href={item.href}
+                  href={item.href || "#"}
                   className={`flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-colors ${
                     isActive
                       ? "bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300"

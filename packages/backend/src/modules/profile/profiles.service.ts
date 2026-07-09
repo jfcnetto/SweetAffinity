@@ -32,10 +32,6 @@ export const ProfileService = {
     if (existing) {
       // RN-003: relationshipType é imutável após onboarding concluído
       const { id, createdAt, popularityScore, profileViews, deletedAt, ...updateData } = data;
-      
-      if (!isPending) {
-        delete updateData.relationshipType;
-      }
 
       const [updated] = await db
         .update(profiles)

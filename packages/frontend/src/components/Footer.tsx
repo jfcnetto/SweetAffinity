@@ -16,7 +16,7 @@ const Footer: React.FC = () => {
             <h4 className="text-lg font-semibold text-white mb-4">Links Rápidos</h4>
             <ul className="space-y-2">
               <li><Link href="/about" className="hover:text-gradient-pink">Sobre Nós</Link></li>
-              <li><Link href="/blog" className="hover:text-gradient-pink">Blog</Link></li>
+              <li><a href="/blog" target="_blank" rel="noopener noreferrer" className="hover:text-red-500 transition-colors">Blog</a></li>
               <li><Link href="/faq" className="hover:text-gradient-pink">FAQ</Link></li>
               <li><Link href="/plans" className="hover:text-gradient-pink">Planos</Link></li>
             </ul>

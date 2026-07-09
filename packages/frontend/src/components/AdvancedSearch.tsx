@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { FilterCriteria } from '../types';
+import { Button } from '../design-system/components/Button';
 
 interface AdvancedSearchProps {
     onApplyFilters: (filters: FilterCriteria) => void;
@@ -41,6 +42,20 @@ const filterOptions = {
     smoking: ['Nunca', 'Socialmente', 'Frequentemente'],
     drinking: ['Nunca', 'Socialmente', 'Frequentemente'],
     education: ['Ensino Médio', 'Superior Incompleto', 'Superior Completo', 'Pós-graduação', 'Mestrado', 'Doutorado'],
+    partnershipType: [
+      { value: 'companionship', label: 'Companheirismo' },
+      { value: 'financial', label: 'Suporte Financeiro' },
+      { value: 'mentorship', label: 'Mentoria & Networking' },
+      { value: 'travel', label: 'Viagens & Aventuras' },
+      { value: 'other', label: 'Outro' }
+    ],
+    meetingFrequency: [
+      { value: 'flexible', label: 'Flexível / Casual' },
+      { value: 'weekly', label: 'Semanal' },
+      { value: 'bi_weekly', label: 'Quinzenal' },
+      { value: 'monthly', label: 'Mensal' },
+      { value: 'multi_weekly', label: 'Múltiplas vezes na semana' }
+    ]
 };
 
 const AdvancedSearch: React.FC<AdvancedSearchProps> = ({ onApplyFilters, onClearFilters }) => {
@@ -95,6 +110,24 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({ onApplyFilters, onClear
 
     const mapToOptions = (arr: string[]) => arr.map(item => ({ value: item, label: item }));
 
+    const radiusOptions = [
+        { value: '10', label: 'Até 10 km' },
+        { value: '25', label: 'Até 25 km' },
+        { value: '50', label: 'Até 50 km' },
+        { value: '100', label: 'Até 100 km' },
+        { value: '250', label: 'Até 250 km' },
+    ];
+
+    const ageOptions = Array.from({ length: 53 }, (_, i) => ({
+        value: String(18 + i),
+        label: `${18 + i} anos`,
+    }));
+
+    const heightOptions = Array.from({ length: 71 }, (_, i) => ({
+        value: String(150 + i),
+        label: `${(150 + i) / 100}m`,
+    }));
+
     return (
         <div className="bg-white py-6">
             <div className="container mx-auto px-6">
@@ -115,6 +148,21 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({ onApplyFilters, onClear
                 {isOpen && (
                     <div className="mt-4 p-6 border rounded-lg bg-white animate-fade-in-down">
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <FormField label="Distância Máxima">
+                                <SelectInput name="radius" value={localFilters.radius || ''} onChange={handleChange} options={radiusOptions} defaultLabel="Qualquer distância" />
+                            </FormField>
+                            <FormField label="Idade Mínima">
+                                <SelectInput name="ageMin" value={localFilters.ageMin || ''} onChange={handleChange} options={ageOptions} defaultLabel="18 anos" />
+                            </FormField>
+                            <FormField label="Idade Máxima">
+                                <SelectInput name="ageMax" value={localFilters.ageMax || ''} onChange={handleChange} options={ageOptions} defaultLabel="Sem limite" />
+                            </FormField>
+                            <FormField label="Altura Mínima">
+                                <SelectInput name="heightMin" value={localFilters.heightMin || ''} onChange={handleChange} options={heightOptions} defaultLabel="Sem limite" />
+                            </FormField>
+                            <FormField label="Altura Máxima">
+                                <SelectInput name="heightMax" value={localFilters.heightMax || ''} onChange={handleChange} options={heightOptions} defaultLabel="Sem limite" />
+                            </FormField>
                             <FormField label="Estado Civil">
                                 <SelectInput name="maritalStatus" value={localFilters.maritalStatus || ''} onChange={handleChange} options={mapToOptions(filterOptions.maritalStatus)} defaultLabel="Todos" />
                             </FormField>
@@ -124,7 +172,7 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({ onApplyFilters, onClear
                                     {states.map(state => <option key={state.id} value={state.sigla}>{state.nome}</option>)}
                                 </select>
                             </FormField>
-                             <FormField label="Cidade">
+                            <FormField label="Cidade">
                                 <select name="city" value={localFilters.city || ''} onChange={handleChange} disabled={!localFilters.state || isLoadingCities} className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gradient-pink focus:border-gradient-pink bg-white text-sm disabled:bg-gray-100">
                                     <option value="">{isLoadingCities ? 'Carregando...' : 'Todas'}</option>
                                     {cities.map(city => <option key={city.id} value={city.nome}>{city.nome}</option>)}
@@ -148,17 +196,23 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({ onApplyFilters, onClear
                             <FormField label="Bebe?">
                                 <SelectInput name="drinking" value={localFilters.drinking || ''} onChange={handleChange} options={mapToOptions(filterOptions.drinking)} defaultLabel="Todos" />
                             </FormField>
-                            <FormField label="Escolaridade">
+                             <FormField label="Escolaridade">
                                 <SelectInput name="education" value={localFilters.education || ''} onChange={handleChange} options={mapToOptions(filterOptions.education)} defaultLabel="Todas" />
+                            </FormField>
+                            <FormField label="Acordo Desejado">
+                                <SelectInput name="partnershipType" value={localFilters.partnershipType || ''} onChange={handleChange} options={filterOptions.partnershipType} defaultLabel="Todos" />
+                            </FormField>
+                            <FormField label="Frequência de Encontros">
+                                <SelectInput name="meetingFrequency" value={localFilters.meetingFrequency || ''} onChange={handleChange} options={filterOptions.meetingFrequency} defaultLabel="Todas" />
                             </FormField>
                         </div>
                         <div className="flex justify-end gap-4 mt-6 pt-4 border-t">
-                            <button onClick={handleClear} className="px-6 py-2 text-sm font-semibold rounded-full transition-all duration-300 text-gray-600 bg-gray-200 hover:bg-gray-300">
+                            <Button onClick={handleClear} variant="secondary">
                                 Limpar Filtros
-                            </button>
-                            <button onClick={handleApply} className="px-8 py-2 text-sm font-semibold rounded-full transition-all duration-300 bg-gradient-to-r from-gradient-pink to-gradient-orange text-white hover:opacity-90">
+                            </Button>
+                            <Button onClick={handleApply} variant="primary" className="px-8">
                                 Aplicar Filtros
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 )}

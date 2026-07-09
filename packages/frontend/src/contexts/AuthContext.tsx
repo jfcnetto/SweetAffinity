@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import { api } from '../services/api';
+import { PinLockOverlay } from '../components/PinLockOverlay';
 
 interface UserData {
   id?: string;
@@ -12,6 +13,7 @@ interface UserData {
   isPremium?: boolean;
   profileType?: string;
   hasPhotos?: boolean;
+  primaryPhotoUrl?: string | null;
 }
 
 interface AuthContextData {
@@ -21,6 +23,12 @@ interface AuthContextData {
   login: (accessToken: string, refreshToken: string) => void;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  discretionMode: boolean;
+  toggleDiscretionMode: () => void;
+  isLocked: boolean;
+  unlockApp: () => void;
+  savedPin: string;
+  setAppPin: (newPin: string) => void;
 }
 
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
@@ -28,6 +36,9 @@ const AuthContext = createContext<AuthContextData>({} as AuthContextData);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [discretionMode, setDiscretionMode] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
+  const [savedPin, setSavedPin] = useState('1234'); // PIN padrão de teste
 
   const fetchCurrentUser = async () => {
     try {
@@ -42,13 +53,66 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const mode = localStorage.getItem('discretion_mode') === 'true';
+      setDiscretionMode(mode);
+      
+      const pin = localStorage.getItem('discretion_pin') || '1234';
+      setSavedPin(pin);
+
+      const lockedState = localStorage.getItem('discretion_locked') === 'true';
+      if (mode && lockedState) {
+        setIsLocked(true);
+      }
+    }
+  }, []);
+
+  // Monitora inatividade de 5 minutos para bloquear com PIN
+  useEffect(() => {
+    if (!discretionMode || !user) return;
+
+    let timeoutId: NodeJS.Timeout;
+
+    const resetTimer = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        setIsLocked(true);
+        localStorage.setItem('discretion_locked', 'true');
+      }, 5 * 60 * 1000); // 5 minutos
+    };
+
+    window.addEventListener('mousemove', resetTimer);
+    window.addEventListener('keydown', resetTimer);
+    window.addEventListener('click', resetTimer);
+
+    resetTimer();
+
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('mousemove', resetTimer);
+      window.removeEventListener('keydown', resetTimer);
+      window.removeEventListener('click', resetTimer);
+    };
+  }, [discretionMode, user]);
+
+  // Modifica título da aba discretamente
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      if (discretionMode) {
+        document.title = 'Meu Blog de Receitas';
+      } else {
+        document.title = 'Sweet Affinity';
+      }
+    }
+  }, [discretionMode]);
+
+  useEffect(() => {
     // 1. Checa se o Google OAuth injetou tokens na URL via query params
     const params = new URLSearchParams(window.location.search);
     const urlAccessToken = params.get('access_token');
     const urlRefreshToken = params.get('refresh_token');
 
     if (urlAccessToken && urlRefreshToken) {
-      // Limpa a URL do navegador para não exibir o token
       window.history.replaceState({}, document.title, window.location.pathname);
       login(urlAccessToken, urlRefreshToken);
       return;
@@ -66,20 +130,59 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = (accessToken: string, refreshToken: string) => {
     localStorage.setItem('sweet_access_token', accessToken);
     localStorage.setItem('sweet_refresh_token', refreshToken);
-    // Carrega dados frescos imediatamente após login
     fetchCurrentUser();
   };
 
   const logout = () => {
     localStorage.removeItem('sweet_access_token');
     localStorage.removeItem('sweet_refresh_token');
+    localStorage.removeItem('discretion_locked');
     setUser(null);
     window.location.href = '/';
   };
 
+  const toggleDiscretionMode = () => {
+    const nextMode = !discretionMode;
+    setDiscretionMode(nextMode);
+    localStorage.setItem('discretion_mode', String(nextMode));
+    if (!nextMode) {
+      setIsLocked(false);
+      localStorage.removeItem('discretion_locked');
+    }
+  };
+
+  const setAppPin = (newPin: string) => {
+    setSavedPin(newPin);
+    localStorage.setItem('discretion_pin', newPin);
+  };
+
+  const unlockApp = () => {
+    setIsLocked(false);
+    localStorage.setItem('discretion_locked', 'false');
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout, refreshUser: fetchCurrentUser }}>
-      {children}
+    <AuthContext.Provider 
+      value={{ 
+        user, 
+        isAuthenticated: !!user, 
+        isLoading, 
+        login, 
+        logout, 
+        refreshUser: fetchCurrentUser,
+        discretionMode,
+        toggleDiscretionMode,
+        isLocked,
+        unlockApp,
+        savedPin,
+        setAppPin
+      }}
+    >
+      {isLocked && !!user ? (
+        <PinLockOverlay onUnlock={unlockApp} savedPin={savedPin} />
+      ) : (
+        children
+      )}
     </AuthContext.Provider>
   );
 };

@@ -1,5 +1,5 @@
 import { db } from "../../db/index.js";
-import { users, refreshTokens, profiles } from "../../db/schema.js";
+import { users, refreshTokens, profiles, notifications } from "../../db/schema.js";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
@@ -117,9 +117,18 @@ export class AuthService {
       // Cria perfil básico padrão no Google Login (RN-001) para evitar quebras de banco
       await db.insert(profiles).values({
         id: newUser.id,
-        displayName: displayName || cleanEmail.split('@')[0],
+        displayName: name || cleanEmail.split('@')[0],
         birthDate: "2000-01-01",
         relationshipType: "baby", // valor padrão
+      });
+
+      // Cria notificação de boas-vindas
+      await db.insert(notifications).values({
+        userId: newUser.id,
+        type: "system",
+        title: "✨ Bem-vindo!",
+        body: "Complete seu perfil adicionando suas fotos para conseguir matches.",
+        link: "/register/photos",
       });
 
       user = newUser;

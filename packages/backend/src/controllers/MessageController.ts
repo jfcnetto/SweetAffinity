@@ -58,6 +58,27 @@ export const messageRoutes = async (fastify: FastifyInstance) => {
       }
     }
   );
+
+  // =====================================================
+  // GET MESSAGE QUOTA (Passo 4)
+  // =====================================================
+  fastify.get(
+    "/quota",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        await request.jwtVerify();
+        const user = request.user as { sub: string };
+        const { MessageQuotaService } = await import("../services/messageQuota.service.js");
+        const quota = await MessageQuotaService.getMessageQuota(user.sub);
+        return reply.send(quota);
+      } catch (err) {
+        fastify.log.error(err);
+        return reply.status(500).send({
+          message: "Erro ao carregar cota de mensagens.",
+        });
+      }
+    }
+  );
 };
 
 // =====================================================
@@ -158,6 +179,15 @@ export const initChatSocket = (io: Server) => {
           if (containsPhoneNumber(data.content)) {
             return socket.emit("message_error", {
               error: "Por questões de segurança, o envio de contatos pessoais não é permitido.",
+            });
+          }
+
+          // 🛡️ Segurança: Cota de Mensagens (Passo 4)
+          const { MessageQuotaService } = await import("../services/messageQuota.service.js");
+          const hasQuota = await MessageQuotaService.consumeMessage(data.sender_id);
+          if (!hasQuota) {
+            return socket.emit("message_error", {
+              error: "Limite de mensagens mensais gratuitas atingido. Atualize seu plano para continuar conversando sem limites!",
             });
           }
 

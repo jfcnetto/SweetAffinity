@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { Avatar } from '../design-system/components/Avatar';
+import { toast } from '../design-system/components/Toast';
+import { Home, Heart, MessageSquare, ShieldAlert, BookOpen } from 'lucide-react';
 
 interface HeaderProps {
   onLoginClick: () => void;
@@ -22,8 +25,10 @@ const Header: React.FC<HeaderProps> = ({
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const { user } = useAuth();
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const { user, discretionMode, toggleDiscretionMode } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   // Busca notificações reais do banco de dados
   const fetchNotifications = async () => {
@@ -96,6 +101,56 @@ const Header: React.FC<HeaderProps> = ({
           </span>
         </Link>
 
+        {/* Central Navigation Menu */}
+        {isAuthenticated && (
+          <nav className="hidden md:flex items-center space-x-8">
+            <Link
+              href="/"
+              className={`flex items-center text-sm font-semibold transition-colors ${
+                pathname === '/' ? 'text-pink-650 font-bold' : 'text-gray-600 hover:text-pink-650'
+              }`}
+            >
+              <Home className="w-4.5 h-4.5 mr-1.5" />
+              Home
+            </Link>
+            <Link
+              href="/matches"
+              className={`flex items-center text-sm font-semibold transition-colors ${
+                pathname === '/matches' ? 'text-pink-650 font-bold' : 'text-gray-600 hover:text-pink-650'
+              }`}
+            >
+              <Heart className="w-4.5 h-4.5 mr-1.5" />
+              Matches
+            </Link>
+            <Link
+              href="/matches"
+              className={`flex items-center text-sm font-semibold transition-colors relative ${
+                pathname === '/chat' ? 'text-pink-650 font-bold' : 'text-gray-600 hover:text-pink-650'
+              }`}
+            >
+              <MessageSquare className="w-4.5 h-4.5 mr-1.5" />
+              Mensagens
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-2 flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-pink-500"></span>
+                </span>
+              )}
+            </Link>
+            <a
+              href="/blog"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`flex items-center text-sm font-semibold transition-colors ${
+                pathname.startsWith('/blog') ? 'text-pink-650 font-bold' : 'text-gray-600 hover:text-pink-650'
+              }`}
+            >
+              <BookOpen className="w-4.5 h-4.5 mr-1.5" />
+              Blog
+            </a>
+          </nav>
+        )}
+
         <div className="flex items-center space-x-4 relative">
           {isAuthenticated ? (
             <>
@@ -151,14 +206,121 @@ const Header: React.FC<HeaderProps> = ({
               )}
 
               <button
-                onClick={onLogout}
-                className="bg-gray-200 text-gray-700 font-semibold px-6 py-2 rounded-full hover:bg-gray-300 transition-all duration-300"
+                onClick={toggleDiscretionMode}
+                title={discretionMode ? "Desativar Modo Discrição" : "Ativar Modo Discrição"}
+                className={`p-2 rounded-full transition-colors ${
+                  discretionMode
+                    ? 'text-red-500 bg-red-50'
+                    : 'text-gray-600 hover:text-red-500'
+                }`}
               >
-                Sair
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                </svg>
               </button>
+
+              {!user?.isPremium && (
+                <button
+                  onClick={() => router.push('/plans')}
+                  className="bg-red-600 hover:bg-red-700 text-white font-bold px-3.5 py-1.5 rounded-full text-xs transition-colors shadow-sm whitespace-nowrap ml-2"
+                >
+                  Seja Premium
+                </button>
+              )}
+
+              {user && (
+                <div className="relative ml-2">
+                  <button
+                    onClick={() => setShowUserMenu(!showUserMenu)}
+                    className="focus:outline-none flex items-center"
+                    aria-label="User menu"
+                  >
+                    <Avatar
+                      src={user.primaryPhotoUrl || null}
+                      alt={user.email || 'User'}
+                      size="sm"
+                      className="cursor-pointer hover:opacity-90 transition-opacity"
+                      hasBorderShadow={false}
+                    />
+                  </button>
+
+                  {showUserMenu && (
+                    <div className="absolute right-0 mt-3 w-48 bg-white border border-gray-150 rounded-2xl shadow-xl py-2 z-50 animate-fade-in">
+                      <div className="px-4 py-2 border-b border-gray-100 text-xs font-semibold text-gray-450 truncate flex items-center justify-between gap-1.5">
+                        <span className="truncate">{user.email}</span>
+                        {user.isPremium && (
+                          <span className="bg-gradient-to-r from-gradient-pink to-gradient-orange text-white text-[8px] px-1.5 py-0.5 rounded-full font-black uppercase tracking-wider animate-pulse flex-shrink-0">
+                            Elite
+                          </span>
+                        )}
+                      </div>
+                      
+                      {user.email === 'jfcnetto@gmail.com' && (
+                        <Link
+                          href="/admin"
+                          onClick={() => setShowUserMenu(false)}
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-650 transition-colors"
+                        >
+                          Painel Admin
+                        </Link>
+                      )}
+                      
+                      <Link
+                        href={`/profiles/${user.id}`}
+                        onClick={() => setShowUserMenu(false)}
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-650 transition-colors"
+                      >
+                        Ver Perfil
+                      </Link>
+
+                      <Link
+                        href={`/profiles/${user.id}?edit=true`}
+                        onClick={() => setShowUserMenu(false)}
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-650 transition-colors"
+                      >
+                        Editar Perfil
+                      </Link>
+                      
+                      <Link
+                        href="/settings"
+                        onClick={() => setShowUserMenu(false)}
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-650 transition-colors"
+                      >
+                        Configurações
+                      </Link>
+                      
+                      <Link
+                        href="/faq"
+                        onClick={() => setShowUserMenu(false)}
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-650 transition-colors"
+                      >
+                        Ajuda
+                      </Link>
+                      
+                      <hr className="my-1 border-gray-100" />
+                      
+                      <button
+                        onClick={() => { setShowUserMenu(false); onLogout(); }}
+                        className="w-full text-left flex items-center px-4 py-2 text-sm text-red-650 hover:bg-red-50 transition-colors font-semibold"
+                      >
+                        Sair
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           ) : (
             <>
+              <a 
+                href="/blog" 
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-655 hover:text-pink-650 transition-colors duration-300 flex items-center text-sm font-semibold mr-4"
+              >
+                <BookOpen className="w-4 h-4 mr-1.5" />
+                Blog
+              </a>
               <button onClick={onLoginClick} className="text-gray-600 hover:text-intense-red transition-colors duration-300">Entrar</button>
               <button
                 onClick={onRegisterClick}

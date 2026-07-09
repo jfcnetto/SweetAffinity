@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import { S3Client, PutObjectCommand, DeleteObjectCommand, HeadBucketCommand, CreateBucketCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand, HeadBucketCommand, CreateBucketCommand, PutBucketPolicyCommand } from "@aws-sdk/client-s3";
 import { randomUUID } from "crypto";
 import sharp from "sharp";
 
@@ -48,6 +48,31 @@ export const photoRoutes = async (fastify: FastifyInstance) => {
     } else {
       fastify.log.error(`Erro ao verificar a saúde do bucket "${BUCKET_NAME}":`, err);
     }
+  }
+
+  // Define a política pública de leitura (Read-Only) para o bucket no MinIO para que o navegador possa ler as fotos
+  try {
+    const policy = {
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Sid: "PublicRead",
+          Effect: "Allow",
+          Principal: "*",
+          Action: ["s3:GetObject"],
+          Resource: [`arn:aws:s3:::${BUCKET_NAME}/*`],
+        },
+      ],
+    };
+    await s3Client.send(
+      new PutBucketPolicyCommand({
+        Bucket: BUCKET_NAME,
+        Policy: JSON.stringify(policy),
+      })
+    );
+    fastify.log.info(`✅ Política de leitura pública (Public Read) aplicada ao bucket "${BUCKET_NAME}".`);
+  } catch (policyErr) {
+    fastify.log.error(`Erro ao aplicar política pública ao bucket "${BUCKET_NAME}":`, policyErr);
   }
 
   // =====================================================

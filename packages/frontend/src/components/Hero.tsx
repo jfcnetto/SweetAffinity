@@ -1,23 +1,21 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
+import { useAuth } from '../contexts/AuthContext';
 
 interface HeroProps {
   onCtaClick: () => void;
 }
 
 const HERO_IMAGES = [
-  // Casal elegante passeando em ambiente premium (estilo Europa)
-  "https://images.unsplash.com/photo-1501901609772-df0848060b33?q=80&w=1200",
-  // Encontro elegante à noite (jantar romântico sofisticado)
-  "https://images.unsplash.com/photo-1522673607200-164d1b6ce486?q=80&w=1200",
-  // Casal elegante sorrindo e se abraçando em viagem
-  "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?q=80&w=1200",
-  // Casal de braços dados em comemoração ou resort
-  "https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=1200"
+  "/images/hero/hero-couple-strolling.jpg",
+  "/images/hero/hero-romantic-dinner.jpg",
+  "/images/hero/hero-couple-travel.jpg",
+  "/images/hero/hero-luxury-resort.jpg"
 ];
 
 const Hero: React.FC<HeroProps> = ({ onCtaClick }) => {
+  const { isAuthenticated } = useAuth();
   const [heroImage, setHeroImage] = useState(HERO_IMAGES[0]);
 
   useEffect(() => {
@@ -48,12 +46,14 @@ const Hero: React.FC<HeroProps> = ({ onCtaClick }) => {
         <p className="text-base md:text-lg max-w-2xl mx-auto mb-10 text-gray-200 leading-relaxed font-light drop-shadow-md">
           Sweet Affinity é a plataforma exclusiva para quem valoriza a transparência. Conectamos pessoas determinadas e bem-sucedidas que buscam construir parcerias baseadas no respeito mútuo, apoio mútuo e clareza de objetivos desde o primeiro contato.
         </p>
-        <button
-          onClick={onCtaClick}
-          className="bg-gradient-to-r from-gradient-pink to-gradient-orange text-white font-semibold px-10 py-4.5 rounded-full text-base hover:opacity-90 transition-all duration-300 transform hover:scale-105 shadow-lg shadow-pink-900/20"
-        >
-          Iniciar Experiência
-        </button>
+        {!isAuthenticated && (
+          <button
+            onClick={onCtaClick}
+            className="bg-gradient-to-r from-gradient-pink to-gradient-orange text-white font-semibold px-10 py-4.5 rounded-full text-base hover:opacity-90 transition-all duration-300 transform hover:scale-105 shadow-lg shadow-pink-900/20"
+          >
+            Iniciar Experiência
+          </button>
+        )}
       </div>
     </section>
   );

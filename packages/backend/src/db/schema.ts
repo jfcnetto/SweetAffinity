@@ -147,6 +147,29 @@ export const campaignStatusEnum = pgEnum("campaign_status", [
   "failed",
 ]);
 
+export const moderationStatusEnum = pgEnum("moderation_status", [
+  "pending",
+  "approved",
+  "rejected",
+]);
+
+export const partnershipTypeEnum = pgEnum("partnership_type", [
+  "financial",
+  "mentorship",
+  "travel",
+  "companionship",
+  "other",
+]);
+
+export const meetingFrequencyEnum = pgEnum("meeting_frequency", [
+  "daily",
+  "multi_weekly",
+  "weekly",
+  "bi_weekly",
+  "monthly",
+  "flexible",
+]);
+
 // =====================================================
 // USERS
 // =====================================================
@@ -231,6 +254,22 @@ export const profiles = pgTable(
 
     seekingDescription: text("seeking_description"), // ✅ ADICIONADO — spec 3.1.3
 
+    // Novas colunas solicitadas
+    country: text("country"),
+    bodyType: text("body_type"),
+    skinTone: text("skin_tone"),
+    children: text("children"),
+    netWorth: text("net_worth"),
+    seekingGender: text("seeking_gender"),
+    travelPreference: text("travel_preference"),
+
+    // Passo 1 & Passo 10.4
+    lastActiveAt: timestamp("last_active_at", { withTimezone: true }),
+    moderationStatus: moderationStatusEnum("moderation_status").notNull().default("pending"),
+    availability: text("availability"),
+    partnershipType: partnershipTypeEnum("partnership_type"),
+    meetingFrequency: meetingFrequencyEnum("meeting_frequency"),
+
     // ✅ ADICIONADOS: campos de engajamento somente leitura (RN-005)
     popularityScore: integer("popularity_score").notNull().default(0),
     profileViews: integer("profile_views").notNull().default(0),
@@ -255,6 +294,8 @@ export const profiles = pgTable(
     // ✅ ADICIONADO: índice para ordenação de listagem (spec 3.1.4 sort params)
     popularityIdx: index("profiles_popularity_idx").on(table.popularityScore),
     deletedAtIdx: index("profiles_deleted_at_idx").on(table.deletedAt),
+    moderationIdx: index("profiles_moderation_idx").on(table.moderationStatus),
+    lastActiveIdx: index("profiles_last_active_idx").on(table.lastActiveAt),
   })
 );
 
@@ -500,6 +541,12 @@ export const auditLogs = pgTable(
 // BLOG POSTS (Growth / SEO)
 // =====================================================
 
+export const blogPostSourceEnum = pgEnum("blog_post_source", [
+  "ai_auto",
+  "ai_manual",
+  "manual"
+]);
+
 export const blogPosts = pgTable(
   "blog_posts",
   {
@@ -508,6 +555,7 @@ export const blogPosts = pgTable(
     slug: text("slug").notNull(),
     content: text("content").notNull(),
     metaDescription: text("meta_description").notNull(),
+    source: blogPostSourceEnum("source").notNull().default("manual"),
     authorId: uuid("author_id").references(() => users.id, { onDelete: "set null" }),
 
     publishedAt: timestamp("published_at", { withTimezone: true })
@@ -802,4 +850,46 @@ export const siteSettings = pgTable(
     updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
   }
+);
+
+// =====================================================
+// PLANS
+// =====================================================
+export const plans = pgTable(
+  "plans",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: text("name").notNull(),
+    priceCents: integer("price_cents").notNull(),
+    billingPeriod: text("billing_period").notNull(), // 'monthly', 'yearly', etc.
+    features: jsonb("features").notNull().$type<string[]>(),
+    stripePriceId: text("stripe_price_id"),
+    isActive: boolean("is_active").notNull().default(true),
+    isHighlighted: boolean("is_highlighted").notNull().default(false),
+    discountPercentage: integer("discount_percentage").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
+  }
+);
+
+// =====================================================
+// PROFILE MODERATION QUEUE
+// =====================================================
+export const profileModerationQueue = pgTable(
+  "profile_moderation_queue",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    status: moderationStatusEnum("status").notNull().default("pending"),
+    reviewedBy: uuid("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    rejectionReason: text("rejection_reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    profileIdx: index("mod_queue_profile_idx").on(table.profileId),
+    statusIdx: index("mod_queue_status_idx").on(table.status),
+  })
 );

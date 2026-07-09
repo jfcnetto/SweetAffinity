@@ -44,8 +44,8 @@ const SocialProof: React.FC = () => {
 
         <div className="grid md:grid-cols-3 gap-8">
           {testimonials.map((t, idx) => (
-            <div 
-              key={idx} 
+            <div
+              key={idx}
               className="bg-white dark:bg-gray-900 p-8 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md hover:border-pink-500/10 transition-all duration-300 flex flex-col justify-between"
             >
               <div>
@@ -55,13 +55,14 @@ const SocialProof: React.FC = () => {
                   {t.quote}
                 </p>
               </div>
-              
+
               <div className="flex items-center mt-4 pt-6 border-t border-gray-100 dark:border-gray-800">
                 <div className="relative w-12 h-12 rounded-full overflow-hidden mr-4">
-                  <Image 
-                    src={t.image} 
+                  <Image
+                    src={t.image}
                     alt={t.couple}
                     fill
+                    sizes="48px"
                     className="object-cover"
                   />
                 </div>
@@ -77,14 +78,18 @@ const SocialProof: React.FC = () => {
             </div>
           ))}
         </div>
-        
+
         {/* Motivating note */}
         <div className="mt-16 text-center max-w-2xl mx-auto border-t border-dashed border-gray-200 dark:border-gray-800 pt-12">
           <h3 className="text-sm text-gray-900 dark:text-white uppercase tracking-wider font-bold mb-3">
             Expectativas transparentes, conexões objetivas
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed font-light">
-            Sabemos que o seu tempo é precioso. O Sweet Affinity foi desenvolvido para quem deseja pular a fase de incertezas e suposições comuns dos encontros tradicionais. Proporcionamos um ambiente maduro e seguro onde estilo de vida e objetivos são alinhados com clareza e respeito mútuo desde o primeiro dia.
+            Sabemos que o seu tempo é precioso.
+            <br />
+            O Sweet Affinity foi desenvolvido para quem deseja pular a fase de incertezas e suposições comuns dos encontros tradicionais.
+            <br />
+            Proporcionamos um ambiente maduro e seguro onde estilo de vida e objetivos são alinhados com clareza e respeito mútuo desde o primeiro dia.
           </p>
         </div>
       </div>

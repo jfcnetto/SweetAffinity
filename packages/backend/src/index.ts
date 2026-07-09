@@ -27,6 +27,7 @@ import {
 import { adminRoutes } from "./controllers/AdminController.js";
 import { matchRoutes } from "./controllers/MatchController.js";
 import { paymentRoutes } from "./controllers/PaymentController.js";
+import { plansRoutes } from "./controllers/PlansController.js";
 import { notificationRoutes } from "./controllers/NotificationController.js";
 import { lgpdRoutes } from "./controllers/LgpdController.js";
 import { subscriptionRoutes } from "./controllers/SubscriptionController.js";
@@ -36,6 +37,7 @@ import { aiUsageRoutes } from "./controllers/AiUsageController.js";
 import { accessRoutes } from "./controllers/AccessController.js";
 import { communicationsRoutes } from "./controllers/CommunicationsController.js";
 import { siteSettingsRoutes } from "./controllers/SiteSettingsController.js";
+import { blogRoutes } from "./controllers/BlogController.js";
 
 // Segurança & Monitoramento
 import helmet from "@fastify/helmet";
@@ -96,9 +98,12 @@ async function start() {
       reply.status(500).send({ message: "Internal Server Error" });
     });
 
-    server.log.info("🔄 Verificando conexão com PostgreSQL...");
     await testDatabase();
     server.log.info("✅ Banco conectado");
+
+    // Executa bootstrap do banco de dados para criar tabelas/colunas se não existirem (Passo 1)
+    const { bootstrapDatabase } = await import("./db/bootstrap.js");
+    await bootstrapDatabase();
 
     // =====================================================
     // PLUGINS (ordem obrigatória: cors/helmet → rateLimit → multipart → jwt)
@@ -127,6 +132,19 @@ async function start() {
     });
 
     await server.register(jwtPlugin);
+
+    // Hook global para atualizar lastActiveAt (Passo 5)
+    server.addHook("preHandler", async (request, reply) => {
+      try {
+        if (request.headers.authorization) {
+          await request.jwtVerify();
+          const { activityMiddleware } = await import("./middleware/activity.middleware.js");
+          await activityMiddleware(request, reply);
+        }
+      } catch (err) {
+        // Ignora erros de JWT aqui para deixar os controllers/guards de rota tratarem
+      }
+    });
 
     // =====================================================
     // OAUTH2 (GOOGLE)
@@ -186,6 +204,8 @@ async function start() {
       prefix: "/payment",
     });
 
+    await server.register(plansRoutes);
+
     await server.register(notificationRoutes, {
       prefix: "/notifications",
     });
@@ -196,6 +216,10 @@ async function start() {
 
     await server.register(subscriptionRoutes, {
       prefix: "/subscriptions",
+    });
+
+    await server.register(blogRoutes, {
+      prefix: "/blog",
     });
 
     // CRM — Painel Administrativo Completo
@@ -232,12 +256,27 @@ async function start() {
 
     server.log.info(`🚀 Backend iniciado na porta ${port}`);
 
-    // =====================================================
-    // BLOG AI GENERATOR CRON
-    // =====================================================
+    // Executa o seed de planos em background no início da aplicação (Passo 6)
+    import("./db/seed-plans.js")
+      .then(() => console.log("🌱 Seed de planos executado com sucesso no startup."))
+      .catch((err) => console.error("⚠️ Falha ao importar/executar seed de planos:", err));
+
+    // Promove contas locais para admin para facilitar desenvolvimento do CRM
+    import("./make-admin.js")
+      .catch((err) => console.error("⚠️ Falha ao executar make-admin:", err));
+
     const { runDailyBlogCron } = await import("./jobs/blogGenerator.js");
+    
     setInterval(() => {
       runDailyBlogCron().catch(err => server.log.error(err));
+    }, 24 * 60 * 60 * 1000); // Roda a cada 24 horas
+
+    // =====================================================
+    // INACTIVE PROFILES JOB (Passo 5)
+    // =====================================================
+    const { runInactiveProfilesJob } = await import("./jobs/inactiveProfilesJob.js");
+    setInterval(() => {
+      runInactiveProfilesJob().catch(err => server.log.error(err));
     }, 24 * 60 * 60 * 1000); // Roda a cada 24 horas
 
     // =====================================================

@@ -212,10 +212,10 @@ export async function authRoutes(app: any) {
     }
 
     try {
-      const userId = await AuthService.rotateRefreshToken(refreshToken);
+      const { userId, newRefreshToken } = await AuthService.rotateRefreshToken(refreshToken);
       const accessToken = app.jwt.sign({ sub: userId }, { expiresIn: "15m" });
 
-      return reply.send({ accessToken });
+      return reply.send({ accessToken, refreshToken: newRefreshToken });
 
     } catch (err: any) {
       if (
@@ -321,15 +321,27 @@ export async function authRoutes(app: any) {
 
     // Verifica se o usuário tem fotos
     const userPhotos = await db
-      .select({ id: photos.id })
+      .select({ id: photos.id, storagePath: photos.storagePath, isPrimary: photos.isPrimary })
       .from(photos)
-      .where(eq(photos.userId, req.user.sub))
-      .limit(1);
+      .where(eq(photos.userId, req.user.sub));
+      
     const hasPhotos = userPhotos.length > 0;
+    const primaryPhoto = userPhotos.find(p => p.isPrimary) || userPhotos[0];
+    
+    // Resolve URL pública do MinIO
+    const MINIO_URL = process.env.MINIO_PUBLIC_URL || "http://localhost:9000/sweetaffinity-media";
+    const primaryPhotoUrl = primaryPhoto ? `${MINIO_URL}/${primaryPhoto.storagePath}` : null;
 
     // Verifica se o cadastro está completo (se tem cidade e estado preenchidos)
     const hasCompletedProfile = profile && profile.city !== null && profile.state !== null;
 
-    return reply.send({ user: { ...result[0], hasPhotos, hasCompletedProfile } });
+    return reply.send({ 
+      user: { 
+        ...result[0], 
+        hasPhotos, 
+        hasCompletedProfile, 
+        primaryPhotoUrl 
+      } 
+    });
   });
 }

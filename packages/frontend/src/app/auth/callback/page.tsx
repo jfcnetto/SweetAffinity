@@ -14,20 +14,39 @@ export default function AuthCallbackPage() {
   const { refreshUser } = useAuth();
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
-    const refreshToken = params.get('refreshToken');
+    const processCallback = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('token');
+      const refreshToken = params.get('refreshToken');
 
-    if (token) {
-      localStorage.setItem('accessToken', token);
-      if (refreshToken) {
-        localStorage.setItem('refreshToken', refreshToken);
+      if (token) {
+        localStorage.setItem('accessToken', token);
+        if (refreshToken) {
+          localStorage.setItem('refreshToken', refreshToken);
+        }
+        
+        const pendingType = localStorage.getItem('pendingProfileType');
+        if (pendingType) {
+            try {
+                // Ensure api uses the new token explicitly in case the interceptor isn't ready
+                const { api } = await import('../../../services/api');
+                await api.post('/profiles', { relationshipType: pendingType }, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+            } catch(e) {
+                console.error('Failed to update profile type', e);
+            }
+            localStorage.removeItem('pendingProfileType');
+        }
+
+        refreshUser?.();
+        router.replace('/feed');
+      } else {
+        router.replace('/?error=oauth_failed');
       }
-      refreshUser?.();
-      router.replace('/feed');
-    } else {
-      router.replace('/?error=oauth_failed');
-    }
+    };
+    
+    processCallback();
   }, [router, refreshUser]);
 
   return (

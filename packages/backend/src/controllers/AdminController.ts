@@ -523,4 +523,89 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
       return reply.status(500).send({ message: "Erro ao banir usuário." });
     }
   });
+
+  // =====================================================
+  // 10. MODERATION QUEUE (Passo 2 e 7)
+  // =====================================================
+
+  fastify.get("/moderation/pending", {
+    preHandler: [requirePermission("users.view")]
+  }, async (request, reply) => {
+    try {
+      const result = await db
+        .select({
+          id: profiles.id,
+          displayName: profiles.displayName,
+          birthDate: profiles.birthDate,
+          gender: profiles.gender,
+          relationshipType: profiles.relationshipType,
+          state: profiles.state,
+          city: profiles.city,
+          bio: profiles.bio,
+          createdAt: profiles.createdAt,
+        })
+        .from(profiles)
+        .where(eq(profiles.moderationStatus, "pending"))
+        .orderBy(desc(profiles.createdAt));
+
+      return reply.send(result);
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.status(500).send({ message: "Erro ao carregar fila de moderação." });
+    }
+  });
+
+  fastify.post("/moderation/:profileId/approve", {
+    preHandler: [requirePermission("users.edit")]
+  }, async (request, reply) => {
+    const { profileId } = request.params as { profileId: string };
+    const adminUser = request.user as any;
+    try {
+      const { ModerationService } = await import("../services/moderation.service.js");
+      await ModerationService.approveProfile(profileId, adminUser.sub);
+      
+      await db.insert(auditLogs).values({
+        adminId: adminUser.sub,
+        action: "approve_profile",
+        entity: "profile",
+        entityId: profileId,
+        details: {},
+      });
+
+      return reply.send({ success: true, message: "Perfil aprovado com sucesso." });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.status(500).send({ message: "Erro ao aprovar perfil." });
+    }
+  });
+
+  fastify.post("/moderation/:profileId/reject", {
+    preHandler: [requirePermission("users.edit")]
+  }, async (request, reply) => {
+    const { profileId } = request.params as { profileId: string };
+    const { reason } = request.body as { reason: string };
+    const adminUser = request.user as any;
+    
+    if (!reason || reason.trim() === "") {
+      return reply.status(400).send({ message: "Motivo da rejeição é obrigatório." });
+    }
+
+    try {
+      const { ModerationService } = await import("../services/moderation.service.js");
+      await ModerationService.rejectProfile(profileId, reason, adminUser.sub);
+
+      await db.insert(auditLogs).values({
+        adminId: adminUser.sub,
+        action: "reject_profile",
+        entity: "profile",
+        entityId: profileId,
+        details: { reason },
+      });
+
+      return reply.send({ success: true, message: "Perfil rejeitado com sucesso." });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.status(500).send({ message: "Erro ao rejeitar perfil." });
+    }
+  });
 };

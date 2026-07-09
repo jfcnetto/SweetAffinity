@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Profile } from '../types';
+import { Card } from '../design-system/components/Card';
 
 const HeartIcon: React.FC<{ isFavorited: boolean }> = ({ isFavorited }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill={isFavorited ? '#FD267D' : 'white'} stroke={isFavorited ? '#FD267D' : 'white'} strokeWidth="1.5">
@@ -27,7 +28,7 @@ const ProfileCard: React.FC<{ profile: Profile; isFavorited: boolean; onToggleFa
   const imageUrl = profile.primary_photo_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=60';
 
   return (
-    <div className="group relative overflow-hidden rounded-lg shadow-lg h-80">
+    <Card hoverEffect={true} className="relative overflow-hidden h-80 p-0 rounded-2xl border-none">
       <img src={imageUrl} alt={profile.display_name} className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500" />
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
       <div className="absolute bottom-0 left-0 p-4 text-white">
@@ -50,7 +51,7 @@ const ProfileCard: React.FC<{ profile: Profile; isFavorited: boolean; onToggleFa
               </svg>
           </div>
       )}
-    </div>
+    </Card>
   );
 };
 

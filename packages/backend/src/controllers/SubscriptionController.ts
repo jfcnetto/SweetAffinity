@@ -291,10 +291,70 @@ export async function subscriptionRoutes(app: FastifyInstance) {
       }
 
       try {
+        if (event.type === "checkout.session.completed") {
+          const session = event.data.object as Stripe.Checkout.Session;
+          const userId = session.metadata?.userId;
+          const stripeSubscriptionId = session.subscription as string;
+          const stripeCustomerId = session.customer as string;
+
+          if (userId && stripeSubscriptionId) {
+            const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+            const periodEnd = new Date(stripeSub.current_period_end * 1000);
+            
+            const priceId = stripeSub.items.data[0]?.price.id;
+            const amount = stripeSub.items.data[0]?.plan?.amount || 0;
+
+            await db.insert(subscriptions).values({
+              userId,
+              stripeSubscriptionId,
+              stripeCustomerId,
+              status: "active",
+              planId: priceId || "unknown",
+              amount,
+              currentPeriodEnd: periodEnd,
+            });
+
+            await db.update(users).set({ isPremium: true }).where(eq(users.id, userId));
+
+            await db.insert(notifications).values({
+              userId,
+              type: "payment",
+              title: "Assinatura ativada! 🎉",
+              body: "Sua assinatura premium foi ativada com sucesso. Aproveite todos os benefícios!",
+              link: "/feed",
+            });
+          }
+        }
+
+        if (event.type === "customer.subscription.updated") {
+          const stripeSub = event.data.object as Stripe.Subscription;
+          const periodEnd = new Date(stripeSub.current_period_end * 1000);
+
+          await db
+            .update(subscriptions)
+            .set({
+              status: stripeSub.status === "active" ? "active" : "expired",
+              currentPeriodEnd: periodEnd,
+              updatedAt: new Date(),
+            })
+            .where(eq(subscriptions.stripeSubscriptionId, stripeSub.id));
+            
+          if (stripeSub.status !== "active") {
+            const [localSub] = await db
+              .select({ userId: subscriptions.userId })
+              .from(subscriptions)
+              .where(eq(subscriptions.stripeSubscriptionId, stripeSub.id))
+              .limit(1);
+              
+            if (localSub) {
+              await db.update(users).set({ isPremium: false }).where(eq(users.id, localSub.userId));
+            }
+          }
+        }
+
         if (event.type === "customer.subscription.deleted") {
           const stripeSub = event.data.object as Stripe.Subscription;
 
-          // Localiza assinatura local pelo ID do Stripe e marca como expirada
           const [localSub] = await db
             .select({ userId: subscriptions.userId })
             .from(subscriptions)
@@ -307,13 +367,11 @@ export async function subscriptionRoutes(app: FastifyInstance) {
               .set({ status: "expired", updatedAt: new Date() })
               .where(eq(subscriptions.stripeSubscriptionId, stripeSub.id));
 
-            // Remove acesso premium do usuário
             await db
               .update(users)
               .set({ isPremium: false })
               .where(eq(users.id, localSub.userId));
 
-            // Notificação in-app
             await db.insert(notifications).values({
               userId: localSub.userId,
               type: "payment",
