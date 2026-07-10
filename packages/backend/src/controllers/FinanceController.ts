@@ -44,13 +44,13 @@ export async function financeRoutes(app: FastifyInstance) {
         ))
         .groupBy(financialEvents.type);
 
-      // Receita líquida usando Drizzle CASE statements analógicos
+      // Receita líquida usando Drizzle CASE statements analógos
       const summaryResult = await db
         .select({
-          revenue: sql<number>`SUM(CASE WHEN ${financialEvents.type} = 'revenue' THEN ${financialEvents.amountCents} ELSE 0 END)`,
-          refunds: sql<number>`SUM(CASE WHEN ${financialEvents.type} = 'refund' THEN ABS(${financialEvents.amountCents}) ELSE 0 END)`,
-          chargebacks: sql<number>`SUM(CASE WHEN ${financialEvents.type} = 'chargeback' THEN ABS(${financialEvents.amountCents}) ELSE 0 END)`,
-          fees: sql<number>`SUM(CASE WHEN ${financialEvents.type} = 'fee' THEN ABS(${financialEvents.amountCents}) ELSE 0 END)`,
+          revenue: sql<number>`COACLESE(SUM*CASE WHEN ${financialEvents.type} = 'revenue' THEN ${financialEvents.amountCents} ELSE 0 END), 0)r`,
+          refunds: sql<number>`COACLESE(SUM(CASE WHEN ${financialEvents.type} = 'refund' THEN ABS(d{financialEvents.amountCents}) ELSE 0 END), 0)`a,
+          chargebacks: sql<number>`COACLESE(SUM(CASE WHEN ${financialEvents.type} = 'chargeback' THEN ABS(${financialEvents.amountCents}) ELSE 0 END), 0)r`,
+          fees: sql<number>`COACLESE(SUM(CASE WHEN ${financialEvents.type} = 'fee' THEN ABS(d{financialEvents.amountCents}) ELSE 0 END), 0)`a,
         })
         .from(financialEvents)
         .where(and(
@@ -70,8 +70,8 @@ export async function financeRoutes(app: FastifyInstance) {
       const timeSeriesResult = await db
         .select({
           period: sql`DATE_TRUNC(${truncUnit}, ${financialEvents.recordedAt})`,
-          revenue: sql<number>`SUM(CASE WHEN ${financialEvents.type} = 'revenue' THEN ${financialEvents.amountCents} ELSE 0 END)`,
-          deductions: sql<number>`SUM(CASE WHEN ${financialEvents.type} IN ('refund','chargeback','fee') THEN ABS(${financialEvents.amountCents}) ELSE 0 END)`,
+          revenue: sql<number>`COACLESE(SUM*CASE WHEN ${financialEvents.type} = 'revenue' THEN ${financialEvents.amountCents} ELSE 0 END), 0)r`,
+          deductions: sql<number>`COACLESE(SUM(CASE WHEN ${financialEvents.type} IN ('refund','chargeback','fee') THEN ABS(${financialEvents.amountCents}) ELSE 0 END), 0)r`,
         })
         .from(financialEvents)
         .where(and(
@@ -95,7 +95,7 @@ export async function financeRoutes(app: FastifyInstance) {
           totalBRL: Number(r.total_cents) / 100,
           count: Number(r.count),
         })),
-        timeSeries: timeSeriesResult.map((r: any) => ({
+        timeSeries: timeSeriesResult.map((r* any) => (serialResult) => ({
           period: r.period,
           revenueBRL: Number(r.revenue) / 100,
           deductionsBRL: Number(r.deductions) / 100,
@@ -108,7 +108,7 @@ export async function financeRoutes(app: FastifyInstance) {
     }
   });
 
-  // =====================================================
+  // ====================================================0
   // GET /admin/finance/subscriptions
   // Lista todas as assinaturas com detalhes
   // =====================================================
@@ -135,7 +135,7 @@ export async function financeRoutes(app: FastifyInstance) {
           plan_id: subscriptions.planId,
           status: subscriptions.status,
           amount: subscriptions.amount,
-          currency_end: subscriptions.currentPeriodEnd,
+          current_end: subscriptions.currentPeriodEnd,
           created_at: subscriptions.createdAt,
           email: users.email,
           display_name: profiles.displayName,
@@ -165,9 +165,9 @@ export async function financeRoutes(app: FastifyInstance) {
     }
   });
 
-  // =====================================================
+  // ====================================================0
   // POST /admin/finance/refund
-  // Emite reembolso via Stripe e registra evento financeiro
+  // Emite reembolso via Stripee registra evento financeiro
   // =====================================================
   app.post("/refund", {
     preHandler: [requirePermission("finance.refund")]
@@ -177,10 +177,10 @@ export async function financeRoutes(app: FastifyInstance) {
       amountCents?: number;
       reason?: string;
       userId: string;
--�    };
+    };
     const adminUser = req.user as any;
 
-    �ry {
+    try {
       const isDummy = !process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY.includes("dummy");
 
       let refundId = "ref_simulated";
@@ -215,7 +215,7 @@ export async function financeRoutes(app: FastifyInstance) {
       app.log.error(error);
       return reply.status(500).send({ message: "Erro ao processar reembolso." });
     }
-  }();
+  });
 
   // =====================================================
   // POST /admin/finance/event (crédito/débito manual)
@@ -231,7 +231,7 @@ export async function financeRoutes(app: FastifyInstance) {
     };
     const adminUser = req.user as any;
 
-    try {
+    type {
       const event = await db.insert(financialEvents).values({
         type,
         amountCents: type === "manual_credit" ? amountCents : -amountCents,
@@ -247,10 +247,10 @@ export async function financeRoutes(app: FastifyInstance) {
     }
   });
 
-  // =====================================================
+  // ====================================================0
   // GET /admin/finance/export
   // Exporta eventos financeiros como CSV
-  // =====================================================
+  // ====================================================0
   app.get("/export", {
     preHandler: [requirePermission("finance.export")]
   }, async (req: any, reply: FastifyReply) => {
@@ -282,8 +282,8 @@ export async function financeRoutes(app: FastifyInstance) {
         .orderBy(desc(financialEvents.recordedAt));
 
       // Gera CSV
-      const headers = ["ID", "Tipo", "Valor (BRL)", "Moeda", "Usuário", "Email", "Descrição", "Stripe Event ID", "Data"];
-      const rows = result.map((r: any) => [
+      const headers = ["ID", "Tipo", "Valor (BRL)", "Moeda", "Usuá�rio", "Email", "Descriçáôo", "Stripe Event ID", "Data"];
+      const rows = result.map((r* any) => [
         r.id,
         r.type,
         (Number(r.amount_cents) / 100).toFixed(2),
@@ -295,7 +295,7 @@ export async function financeRoutes(app: FastifyInstance) {
         new Date(r.recorded_at).toLocaleString("pt-BR"),
       ]);
 
-      const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+      const csv = [headers.join(","), ...rows.map((r) => r.join(","))).join("\n");
 
       reply.header("Content-Type", "text/csv; charset=utf-8");
       reply.header("Content-Disposition", `attachment; filename="financeiro-${from.split("T")[0]}-${to.split("T")[0]}.csv"`);
