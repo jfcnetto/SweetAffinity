@@ -40,7 +40,8 @@ export class AuthService {
       return user;
     } catch (err: any) {
       // Código 23505 = unique_violation (email duplicado)
-      if (err.code === "23505") {
+      // Drizzle wraps the error, so we also check err.message or err.cause
+      if (err.code === "23505" || (err.message && err.message.includes("duplicate key value violates unique constraint \"users_email_idx\""))) {
         throw new Error("EMAIL_ALREADY_EXISTS");
       }
       throw err;

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import { api } from '../services/api';
 import { PinLockOverlay } from '../components/PinLockOverlay';
@@ -40,17 +40,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLocked, setIsLocked] = useState(false);
   const [savedPin, setSavedPin] = useState('1234'); // PIN padrão de teste
 
-  const fetchCurrentUser = async () => {
+  const fetchCurrentUser = useCallback(async () => {
     try {
       const response = await api.get('/auth/me');
       setUser(response.data.user);
     } catch (err) {
       console.error("Erro ao obter dados do usuário atual", err);
-      logout();
+      // We don't call logout here to avoid circular dependency, we just clear the tokens
+      localStorage.removeItem('sweet_access_token');
+      localStorage.removeItem('sweet_refresh_token');
+      setUser(null);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -127,21 +130,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const login = (accessToken: string, refreshToken: string) => {
+  const login = useCallback((accessToken: string, refreshToken: string) => {
     localStorage.setItem('sweet_access_token', accessToken);
     localStorage.setItem('sweet_refresh_token', refreshToken);
     fetchCurrentUser();
-  };
+  }, [fetchCurrentUser]);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('sweet_access_token');
     localStorage.removeItem('sweet_refresh_token');
     localStorage.removeItem('discretion_locked');
     setUser(null);
     window.location.href = '/';
-  };
+  }, []);
 
-  const toggleDiscretionMode = () => {
+  const toggleDiscretionMode = useCallback(() => {
     const nextMode = !discretionMode;
     setDiscretionMode(nextMode);
     localStorage.setItem('discretion_mode', String(nextMode));
@@ -149,17 +152,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLocked(false);
       localStorage.removeItem('discretion_locked');
     }
-  };
+  }, [discretionMode]);
 
-  const setAppPin = (newPin: string) => {
+  const setAppPin = useCallback((newPin: string) => {
     setSavedPin(newPin);
     localStorage.setItem('discretion_pin', newPin);
-  };
+  }, []);
 
-  const unlockApp = () => {
+  const unlockApp = useCallback(() => {
     setIsLocked(false);
     localStorage.setItem('discretion_locked', 'false');
-  };
+  }, []);
 
   return (
     <AuthContext.Provider 

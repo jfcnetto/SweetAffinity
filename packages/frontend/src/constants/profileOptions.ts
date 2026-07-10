@@ -4,6 +4,12 @@ export const PROFILE_TYPES = [
     { value: 'mommy', label: 'Sugar Mommy' }
 ];
 
+export const GENDER_OPTIONS = [
+    { value: 'female', label: 'Mulher' },
+    { value: 'male', label: 'Homem' },
+    { value: 'other', label: 'Outro' }
+];
+
 export const SEEKING_GENDER = [
     { value: 'HOMEM', label: 'Homens' },
     { value: 'MULHERES', label: 'Mulheres' },
@@ -11,11 +17,10 @@ export const SEEKING_GENDER = [
 ];
 
 export const MARITAL_STATUSES = [
-    'Solteiro(a)', 
-    'Separado(a)', 
-    'Divorciado(a)', 
-    'Viúvo(a)', 
-    'Em um relacionamento'
+    { value: 'single', label: 'Solteiro(a)' },
+    { value: 'married', label: 'Casado(a)' },
+    { value: 'divorced', label: 'Divorciado(a)' },
+    { value: 'widowed', label: 'Viúvo(a)' }
 ];
 
 export const CHILDREN_OPTIONS = [
@@ -74,15 +79,15 @@ export const EYE_COLORS = [
 ];
 
 export const SMOKING_OPTIONS = [
-    'Nunca', 
-    'Socialmente', 
-    'Frequentemente'
+    { value: 'no', label: 'Nunca' },
+    { value: 'occasionally', label: 'Socialmente' },
+    { value: 'yes', label: 'Frequentemente' }
 ];
 
 export const DRINKING_OPTIONS = [
-    'Nunca', 
-    'Socialmente', 
-    'Frequentemente'
+    { value: 'no', label: 'Nunca' },
+    { value: 'occasionally', label: 'Socialmente' },
+    { value: 'yes', label: 'Frequentemente' }
 ];
 
 export const TRAVEL_OPTIONS = [

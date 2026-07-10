@@ -9,7 +9,7 @@ import {
     PROFILE_TYPES, SEEKING_GENDER, MARITAL_STATUSES, CHILDREN_OPTIONS, 
     HEIGHT_OPTIONS, BODY_TYPES, ETHNICITIES, HAIR_COLORS, EYE_COLORS, 
     SMOKING_OPTIONS, DRINKING_OPTIONS, TRAVEL_OPTIONS, EDUCATION_LEVELS, 
-    PROFESSION_OPTIONS, INCOME_RANGES, NET_WORTH_RANGES, PARTNERSHIP_TYPES, MEETING_FREQUENCIES
+    PROFESSION_OPTIONS, INCOME_RANGES, NET_WORTH_RANGES, PARTNERSHIP_TYPES, MEETING_FREQUENCIES, GENDER_OPTIONS
 } from '../constants/profileOptions';
 
 interface OnboardingWizardProps {
@@ -264,6 +264,20 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete, 
                 className="[color-scheme:light]"
               />
             </div>
+            <div className="space-y-4">
+              <div className="w-full">
+                <label className="block text-xs font-semibold text-gray-500 dark:text-white uppercase tracking-wide mb-1">Seu Gênero</label>
+                <select 
+                  className="w-full px-4 py-2.5 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-550 text-slate-900 dark:text-white" 
+                  value={gender} 
+                  onChange={(e) => setGender(e.target.value)}
+                  required
+                >
+                  <option value="">Selecione...</option>
+                  {GENDER_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                </select>
+              </div>
+            </div>
           </div>
         )}
 
@@ -356,21 +370,21 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete, 
                 <label className="block text-xs font-semibold text-gray-500 dark:text-white uppercase tracking-wide mb-1">Fuma?</label>
                 <select className="w-full px-4 py-2.5 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-550 text-slate-900 dark:text-white" value={smoking} onChange={(e) => setSmoking(e.target.value)}>
                   <option value="">Selecione...</option>
-                  {SMOKING_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                  {SMOKING_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                 </select>
               </div>
               <div className="w-full">
                 <label className="block text-xs font-semibold text-gray-500 dark:text-white uppercase tracking-wide mb-1">Bebe?</label>
                 <select className="w-full px-4 py-2.5 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-550 text-slate-900 dark:text-white" value={drinking} onChange={(e) => setDrinking(e.target.value)}>
                   <option value="">Selecione...</option>
-                  {DRINKING_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                  {DRINKING_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                 </select>
               </div>
               <div className="w-full">
                 <label className="block text-xs font-semibold text-gray-500 dark:text-white uppercase tracking-wide mb-1">Estado Civil</label>
                 <select className="w-full px-4 py-2.5 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-550 text-slate-900 dark:text-white" value={maritalStatus} onChange={(e) => setMaritalStatus(e.target.value)}>
                   <option value="">Selecione...</option>
-                  {MARITAL_STATUSES.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                  {MARITAL_STATUSES.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                 </select>
               </div>
               <div className="w-full">

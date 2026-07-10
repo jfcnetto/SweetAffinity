@@ -5,7 +5,7 @@ https://apps.abacus.ai/chatllm/route_llm?category=featured
 
 
 
-Landing Page, Cadastro e Login, Criação de Perfil, Upload de Fotos, Monetização  e blog
+
 https://dashboard.stripe.com/acct_1SNh0FRoTYuGqKaq/test/dashboard
 https://dualite.dev/
 

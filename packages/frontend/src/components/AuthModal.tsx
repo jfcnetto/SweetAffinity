@@ -35,7 +35,8 @@ import {
     PROFILE_TYPES, SEEKING_GENDER, MARITAL_STATUSES, CHILDREN_OPTIONS, 
     HEIGHT_OPTIONS, BODY_TYPES, ETHNICITIES, HAIR_COLORS, EYE_COLORS, 
     SMOKING_OPTIONS, DRINKING_OPTIONS, TRAVEL_OPTIONS, EDUCATION_LEVELS, 
-    PROFESSION_OPTIONS, INCOME_RANGES, NET_WORTH_RANGES, PARTNERSHIP_TYPES, MEETING_FREQUENCIES
+    PROFESSION_OPTIONS, INCOME_RANGES, NET_WORTH_RANGES, PARTNERSHIP_TYPES, MEETING_FREQUENCIES,
+    GENDER_OPTIONS
 } from '../constants/profileOptions';
 
 const FormSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
@@ -54,8 +55,9 @@ const FormField: React.FC<{ label: string; children: React.ReactNode; className?
   </div>
 );
 
-const SelectInput: React.FC<{ id: string; name: string; options: any[] }> = ({ id, name, options }) => (
-    <select id={id} name={name} className="mt-1 block w-full px-3 py-2 border border-gray-350 rounded-md shadow-sm focus:outline-none focus:ring-gradient-pink focus:border-gradient-pink bg-white text-slate-900">
+const SelectInput: React.FC<{ id: string; name: string; options: any[]; required?: boolean }> = ({ id, name, options, required = false }) => (
+    <select id={id} name={name} required={required} className="mt-1 block w-full px-3 py-2 border border-gray-350 rounded-md shadow-sm focus:outline-none focus:ring-gradient-pink focus:border-gradient-pink bg-white text-slate-900">
+        <option value="">Selecione...</option>
         {options.map(opt => (
             typeof opt === 'string' 
                 ? <option key={opt} value={opt}>{opt}</option> 
@@ -163,7 +165,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, initialMode, onRegistrat
             birth_date: birthDate,
             state: formData.get('state'),
             city: formData.get('city'),
-            gender: formData.get('seeking-type'),
+            gender: formData.get('gender'),
+            seeking_gender: formData.get('seeking-type'),
             marital_status: formData.get('marital-status'),
             height_range: formData.get('height'),
             ethnicity: formData.get('ethnicity'),
@@ -335,11 +338,14 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, initialMode, onRegistrat
                 )}
             </FormSection>
             <FormSection title="Quem é Você?">
-                <FormField label="Eu sou">
-                    <SelectInput id="profile-type" name="profile-type" options={PROFILE_TYPES} />
+                <FormField label="Tipo de Perfil (Relacionamento)">
+                    <SelectInput id="profile-type" name="profile-type" options={PROFILE_TYPES} required />
                 </FormField>
-                <FormField label="Busco por">
-                     <SelectInput id="seeking-type" name="seeking-type" options={SEEKING_GENDER} />
+                <FormField label="Meu Gênero">
+                     <SelectInput id="gender" name="gender" options={GENDER_OPTIONS} required />
+                </FormField>
+                <FormField label="Está em busca de quê?">
+                     <SelectInput id="seeking-type" name="seeking-type" options={SEEKING_GENDER} required />
                 </FormField>
             </FormSection>
             <FormSection title="Informações Pessoais">
@@ -349,10 +355,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, initialMode, onRegistrat
                     {!ageError && birthDate && <p className="text-green-500 text-xs mt-1 font-semibold">Idade verificada.</p>}
                 </FormField>
                 <FormField label="Estado Civil">
-                    <SelectInput id="marital-status" name="marital-status" options={MARITAL_STATUSES} />
+                    <SelectInput id="marital-status" name="marital-status" options={MARITAL_STATUSES} required />
                 </FormField>
                 <FormField label="Filhos">
-                     <SelectInput id="children" name="children" options={CHILDREN_OPTIONS} />
+                     <SelectInput id="children" name="children" options={CHILDREN_OPTIONS} required />
                 </FormField>
                 <FormField label="Estado">
                     <select 
@@ -386,50 +392,50 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, initialMode, onRegistrat
             </FormSection>
             <FormSection title="Aparência">
                 <FormField label="Altura">
-                    <SelectInput id="height" name="height" options={HEIGHT_OPTIONS} />
+                    <SelectInput id="height" name="height" options={HEIGHT_OPTIONS} required />
                 </FormField>
-                <FormField label="Tipo Físico">
-                    <SelectInput id="body-type" name="body-type" options={BODY_TYPES} />
+                <FormField label="Tipo de corpo">
+                    <SelectInput id="body-type" name="body-type" options={BODY_TYPES} required />
                 </FormField>
-                 <FormField label="Etnia">
-                    <SelectInput id="ethnicity" name="ethnicity" options={ETHNICITIES} />
+                 <FormField label="Tom de Pele">
+                    <SelectInput id="ethnicity" name="ethnicity" options={ETHNICITIES} required />
                 </FormField>
-                <FormField label="Cor do Cabelo">
-                    <SelectInput id="hair-color" name="hair-color" options={HAIR_COLORS} />
+                <FormField label="Cabelo">
+                    <SelectInput id="hair-color" name="hair-color" options={HAIR_COLORS} required />
                 </FormField>
-                <FormField label="Cor dos Olhos">
-                    <SelectInput id="eye-color" name="eye-color" options={EYE_COLORS} />
+                <FormField label="Cor dos olhos">
+                    <SelectInput id="eye-color" name="eye-color" options={EYE_COLORS} required />
                 </FormField>
             </FormSection>
             <FormSection title="Estilo de Vida">
-                <FormField label="Fuma?">
-                    <SelectInput id="smoking" name="smoking" options={SMOKING_OPTIONS} />
+                <FormField label="Você fuma?">
+                    <SelectInput id="smoking" name="smoking" options={SMOKING_OPTIONS} required />
                 </FormField>
-                <FormField label="Bebe?">
-                    <SelectInput id="drinking" name="drinking" options={DRINKING_OPTIONS} />
+                <FormField label="Você bebe?">
+                    <SelectInput id="drinking" name="drinking" options={DRINKING_OPTIONS} required />
                 </FormField>
-                <FormField label="Disposto(a) a viajar?">
-                    <SelectInput id="travel" name="travel" options={TRAVEL_OPTIONS} />
+                <FormField label="Disponibilidade para viajar">
+                    <SelectInput id="travel" name="travel" options={TRAVEL_OPTIONS} required />
                 </FormField>
             </FormSection>
             <FormSection title="Carreira e Finanças">
-                <FormField label="Escolaridade">
-                    <SelectInput id="education" name="education" options={EDUCATION_LEVELS} />
+                <FormField label="Formação acadêmica">
+                    <SelectInput id="education" name="education" options={EDUCATION_LEVELS} required />
                 </FormField>
                 <FormField label="Profissão">
-                    <SelectInput id="occupation" name="occupation" options={PROFESSION_OPTIONS} />
+                    <SelectInput id="occupation" name="occupation" options={PROFESSION_OPTIONS} required />
                 </FormField>
-                <FormField label="Renda Anual">
-                    <SelectInput id="income" name="income" options={INCOME_RANGES} />
+                <FormField label="Renda Mensal / Orçamento">
+                    <SelectInput id="income" name="income" options={INCOME_RANGES} required />
                 </FormField>
-                <FormField label="Patrimônio Líquido">
-                    <SelectInput id="net-worth" name="net-worth" options={NET_WORTH_RANGES} />
+                <FormField label="Patrimônio pessoal">
+                    <SelectInput id="net-worth" name="net-worth" options={NET_WORTH_RANGES} required />
                 </FormField>
                 <FormField label="Acordo Esperado">
-                    <SelectInput id="partnership-type" name="partnership-type" options={PARTNERSHIP_TYPES} />
+                    <SelectInput id="partnership-type" name="partnership-type" options={PARTNERSHIP_TYPES} required />
                 </FormField>
                 <FormField label="Frequência de Encontros">
-                    <SelectInput id="meeting-frequency" name="meeting-frequency" options={MEETING_FREQUENCIES} />
+                    <SelectInput id="meeting-frequency" name="meeting-frequency" options={MEETING_FREQUENCIES} required />
                 </FormField>
             </FormSection>
           <div className="pt-4">

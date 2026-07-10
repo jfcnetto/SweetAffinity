@@ -14,7 +14,7 @@ import {
     HEIGHT_OPTIONS, BODY_TYPES, ETHNICITIES, HAIR_COLORS, EYE_COLORS, 
     SMOKING_OPTIONS, DRINKING_OPTIONS, TRAVEL_OPTIONS, EDUCATION_LEVELS, 
     PROFESSION_OPTIONS, INCOME_RANGES, NET_WORTH_RANGES, PARTNERSHIP_TYPES, MEETING_FREQUENCIES
-} from '../../../../constants/profileOptions';
+} from '../../../constants/profileOptions';
 import { ArrowLeft, Heart, Shield, Flag, MessageCircle, Edit3, Save, X, User } from 'lucide-react';
 
 interface Profile {
@@ -549,7 +549,7 @@ export default function ProfileDetailPage() {
                         required
                       >
                         <option value="">Selecione...</option>
-                        {SMOKING_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                        {SMOKING_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                       </select>
                     </div>
 
@@ -564,7 +564,7 @@ export default function ProfileDetailPage() {
                         required
                       >
                         <option value="">Selecione...</option>
-                        {DRINKING_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                        {DRINKING_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                       </select>
                     </div>
 
@@ -579,10 +579,7 @@ export default function ProfileDetailPage() {
                         required
                       >
                         <option value="">Selecione...</option>
-                        <option value="single">Solteiro(a)</option>
-                        <option value="married">Casado(a)</option>
-                        <option value="divorced">Divorciado(a)</option>
-                        <option value="widowed">Viúvo(a)</option>
+                        {MARITAL_STATUSES.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                       </select>
                     </div>
 
@@ -840,14 +837,18 @@ export default function ProfileDetailPage() {
                 )}
                 {profile.smoking && (
                   <div className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center py-2 border-b border-gray-100 dark:border-gray-800 gap-1 sm:gap-4">
-                    <span className="font-semibold text-gray-400 dark:text-gray-300">Fuma?</span>
-                    <span className="font-bold text-gray-800 dark:text-white">{profile.smoking === 'yes' ? 'Sim' : profile.smoking === 'no' ? 'Não' : 'Ocasionalmente'}</span>
+                    <span className="font-semibold text-gray-400 dark:text-gray-300">Você fuma?</span>
+                    <span className="font-bold text-gray-800 dark:text-white">
+                      {SMOKING_OPTIONS.find(o => o.value === profile.smoking)?.label || profile.smoking}
+                    </span>
                   </div>
                 )}
                 {profile.drinking && (
                   <div className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center py-2 border-b border-gray-100 dark:border-gray-800 gap-1 sm:gap-4">
-                    <span className="font-semibold text-gray-400 dark:text-gray-300">Bebe?</span>
-                    <span className="font-bold text-gray-800 dark:text-white">{profile.drinking === 'yes' ? 'Sim' : profile.drinking === 'no' ? 'Não' : 'Ocasionalmente'}</span>
+                    <span className="font-semibold text-gray-400 dark:text-gray-300">Você bebe?</span>
+                    <span className="font-bold text-gray-800 dark:text-white">
+                      {DRINKING_OPTIONS.find(o => o.value === profile.drinking)?.label || profile.drinking}
+                    </span>
                   </div>
                 )}
                 {profile.maritalStatus && (
