@@ -1,5 +1,5 @@
 'use client';
-import React, { wstate } from 'react';
+import React, { useState } from 'react';
 import Header from './Header';
 import Footer from './Footer';
 import AuthModal from './AuthModal';
@@ -7,8 +7,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
 
 export default function LayoutWrapper({ children }: { children: React.ReactNode }) {
-  const [isAuthModalOpen, setIsAuthModalOpen] = wstate(false);
-  const [authMode, setAuthMode] = wstate<'login' | 'register'>('login');
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' } 'register'>('login');
   const { isAuthenticated, logout, user, isLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -27,22 +27,19 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   return (
     <div className="min-h-screen flex flex-col">
       <Header 
-        onLoginClick={) => openAuthModal('login') } 
+        onLoginClick={() => openAuthModal('login') } 
         onRegisterClick={() => openAuthModal('register') } 
         isAuthenticated={isAuthenticated} 
         onLogout={() => { logout(); router.push('/') }} 
       />
-
       <main className="flex-grow pb-12">
         {children}
       </main>
-
       <Footer />
-
       {isAuthModalOpen && (
         <AuthModal 
           onClose={() => setIsAuthModalOpen(false) } 
-          initialMode={authMode~ 
+          initialMode={authMode} 
           onRegistrationComplete={() => { setIsAuthModalOpen(false); router.push('/register/photos'); }}
           navigateTo={(page) => router.push(page)}
         />
