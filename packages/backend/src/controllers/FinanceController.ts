@@ -4,8 +4,9 @@ import {
   financialEvents,
   subscriptions,
   users,
+  profiles,
 } from "../db/schema.js";
-import { eq, sql, and, gte, lte, desc } from "drizzle-orm";
+import { eq, sql, and, gte, lte, desc, count, sum } from "drizzle-orm";
 import Stripe from "stripe";
 import { requirePermission } from "../middleware/rbac.js";
 
@@ -29,32 +30,35 @@ export async function financeRoutes(app: FastifyInstance) {
     } = req.query as { from?: string; to?: string; groupBy?: string };
 
     try {
-      // Totais por tipo no período
-      const totalsResult = await db.execute(sql`
-        SELECT
-          type,
-          SUM(amount_cents) as total_cents,
-          COUNT(*) as count
-        FROM financial_events
-        WHERE recorded_at BETWEEN ${from} AND ${to}
-        GROUP BY type
-        ORDER BY type
-      `);
+      // Totais por tipo no período usando Drizzle
+      const totalsResult = await db
+        .select({
+          type: financialEvents.type,
+          total_cents: sum(financialEvents.amountCents),
+          count: count(),
+        })
+        .from(financialEvents)
+        .where(and(
+          gte(financialEvents.recordedAt, new Date(from)),
+          lte(financialEvents.recordedAt, new Date(to))
+        ))
+        .groupBy(financialEvents.type);
 
-      // Receita líquida
-      const summaryResult = await db.execute(sql`
-        SELECT
-          SUM(CASE WHEN type = 'revenue'       THEN amount_cents ELSE 0 END) as revenue,
-          SUM(CASE WHEN type = 'refund'        THEN ABS(amount_cents) ELSE 0 END) as refunds,
-          SUM(CASE WHEN type = 'chargeback'    THEN ABS(amount_cents) ELSE 0 END) as chargebacks,
-          SUM(CASE WHEN type = 'fee'           THEN ABS(amount_cents) ELSE 0 END) as fees,
-          SUM(CASE WHEN type = 'manual_credit' THEN amount_cents ELSE 0 END) as manual_credits,
-          SUM(CASE WHEN type = 'manual_debit'  THEN ABS(amount_cents) ELSE 0 END) as manual_debits
-        FROM financial_events
-        WHERE recorded_at BETWEEN ${from} AND ${to}
-      `);
+      // Receita líquida usando Drizzle CASE statements analógicos
+      const summaryResult = await db
+        .select({
+          revenue: sql<number>`SUM(CASE WHEN ${financialEvents.type} = 'revenue' THEN ${financialEvents.amountCents} ELSE 0 END)`,
+          refunds: sql<number>`SUM(CASE WHEN ${financialEvents.type} = 'refund' THEN ABS(${financialEvents.amountCents}) ELSE 0 END)`,
+          chargebacks: sql<number>`SUM(CASE WHEN ${financialEvents.type} = 'chargeback' THEN ABS(${financialEvents.amountCents}) ELSE 0 END)`,
+          fees: sql<number>`SUM(CASE WHEN ${financialEvents.type} = 'fee' THEN ABS(${financialEvents.amountCents}) ELSE 0 END)`,
+        })
+        .from(financialEvents)
+        .where(and(
+          gte(financialEvents.recordedAt, new Date(from)),
+          lte(financialEvents.recordedAt, new Date(to))
+        ));
 
-      const s = summaryResult.rows[0] as any;
+      const s = summaryResult[0];
       const revenueCents = Number(s.revenue ?? 0);
       const refundsCents = Number(s.refunds ?? 0);
       const chargebacksCents = Number(s.chargebacks ?? 0);
@@ -63,16 +67,19 @@ export async function financeRoutes(app: FastifyInstance) {
 
       // Série temporal (agrupada por período)
       const truncUnit = groupBy === "month" ? "month" : groupBy === "week" ? "week" : "day";
-      const timeSeriesResult = await db.execute(sql`
-        SELECT
-          DATE_TRUNC(${truncUnit}, recorded_at) AS period,
-          SUM(CASE WHEN type = 'revenue' THEN amount_cents ELSE 0 END) as revenue,
-          SUM(CASE WHEN type IN ('refund','chargeback','fee') THEN ABS(amount_cents) ELSE 0 END) as deductions
-        FROM financial_events
-        WHERE recorded_at BETWEEN ${from} AND ${to}
-        GROUP BY period
-        ORDER BY period ASC
-      `);
+      const timeSeriesResult = await db
+        .select({
+          period: sql`DATE_TRUNC(${truncUnit}, ${financialEvents.recordedAt})`,
+          revenue: sql<number>`SUM(CASE WHEN ${financialEvents.type} = 'revenue' THEN ${financialEvents.amountCents} ELSE 0 END)`,
+          deductions: sql<number>`SUM(CASE WHEN ${financialEvents.type} IN ('refund','chargeback','fee') THEN ABS(${financialEvents.amountCents}) ELSE 0 END)`,
+        })
+        .from(financialEvents)
+        .where(and(
+          gte(financialEvents.recordedAt, new Date(from)),
+          lte(financialEvents.recordedAt, new Date(to))
+        ))
+        .groupBy(sql`period`)
+        .orderBy(sql`period ASC`);
 
       return reply.send({
         period: { from, to },
@@ -83,12 +90,12 @@ export async function financeRoutes(app: FastifyInstance) {
           feesBRL: feesCents / 100,
           netRevenueBRL: netRevenueCents / 100,
         },
-        byType: totalsResult.rows.map((r: any) => ({
+        byType: totalsResult.map((r: any) => ({
           type: r.type,
           totalBRL: Number(r.total_cents) / 100,
           count: Number(r.count),
         })),
-        timeSeries: timeSeriesResult.rows.map((r: any) => ({
+        timeSeries: timeSeriesResult.map((r: any) => ({
           period: r.period,
           revenueBRL: Number(r.revenue) / 100,
           deductionsBRL: Number(r.deductions) / 100,
@@ -111,41 +118,44 @@ export async function financeRoutes(app: FastifyInstance) {
     const { status, planId, limit = 20, offset = 0 } = req.query as {
       status?: string;
       planId?: string;
-      limit?: number;
-      offset?: number;
+      limit?: string | number;
+      offset?: string | number;
     };
 
     try {
       const conditions = [];
-      if (status) conditions.push(sql`s.status = ${status}`);
-      if (planId) conditions.push(sql`s.plan_id = ${planId}`);
-      const whereClause = conditions.length > 0 ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``;
+      if (status) conditions.push(eq(subscriptions.status, status as any));
+      if (planId) conditions.push(eq(subscriptions.planId, planId));
 
-      const result = await db.execute(sql`
-        SELECT
-          s.id,
-          s.plan_id,
-          s.status,
-          s.amount,
-          s.current_period_end,
-          s.created_at,
-          u.email,
-          p.display_name
-        FROM subscriptions s
-        JOIN users u ON u.id = s.user_id
-        LEFT JOIN profiles p ON p.id = s.user_id
-        ${whereClause}
-        ORDER BY s.created_at DESC
-        LIMIT ${Number(limit)} OFFSET ${Number(offset)}
-      `);
+      const finalWhere = conditions.length > 0 ? and(...conditions) : undefined;
 
-      const totalResult = await db.execute(sql`
-        SELECT count(*) FROM subscriptions s ${whereClause}
-      `);
+      const result = await db
+        .select({
+          id: subscriptions.id,
+          plan_id: subscriptions.planId,
+          status: subscriptions.status,
+          amount: subscriptions.amount,
+          currency_end: subscriptions.currentPeriodEnd,
+          created_at: subscriptions.createdAt,
+          email: users.email,
+          display_name: profiles.displayName,
+        })
+        .from(subscriptions)
+        .innerJoin(users, eq(users.id, subscriptions.userId))
+        .leftJoin(profiles, eq(profiles.id, subscriptions.userId))
+        .where(finalWhere)
+        .orderBy(desc(subscriptions.createdAt))
+        .limit(Number(limit))
+        .offset(Number(offset));
+
+      const totalCount = await db
+        .select({ count: count() })
+        .from(subscriptions)
+        .where(finalWhere);
 
       return reply.send({
-        data: result.rows,
-        total: Number(totalResult.rows[0].count),
+        data: result,
+        total: Number(totalCount[0].count),
         limit: Number(limit),
         offset: Number(offset),
       });
@@ -167,10 +177,10 @@ export async function financeRoutes(app: FastifyInstance) {
       amountCents?: number;
       reason?: string;
       userId: string;
-    };
+-�    };
     const adminUser = req.user as any;
 
-    try {
+    �ry {
       const isDummy = !process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY.includes("dummy");
 
       let refundId = "ref_simulated";
@@ -205,7 +215,7 @@ export async function financeRoutes(app: FastifyInstance) {
       app.log.error(error);
       return reply.status(500).send({ message: "Erro ao processar reembolso." });
     }
-  });
+  }();
 
   // =====================================================
   // POST /admin/finance/event (crédito/débito manual)
@@ -250,27 +260,30 @@ export async function financeRoutes(app: FastifyInstance) {
     } = req.query as { from?: string; to?: string };
 
     try {
-      const result = await db.execute(sql`
-        SELECT
-          fe.id,
-          fe.type,
-          fe.amount_cents,
-          fe.currency,
-          fe.description,
-          fe.stripe_event_id,
-          fe.recorded_at,
-          u.email AS user_email,
-          p.display_name AS user_name
-        FROM financial_events fe
-        LEFT JOIN users u ON u.id = fe.user_id
-        LEFT JOIN profiles p ON p.id = fe.user_id
-        WHERE fe.recorded_at BETWEEN ${from} AND ${to}
-        ORDER BY fe.recorded_at DESC
-      `);
+      const result = await db
+        .select({
+          id: financialEvents.id,
+          type: financialEvents.type,
+          amount_cents: financialEvents.amountCents,
+          currency: financialEvents.currency,
+          description: financialEvents.description,
+          stripe_event_id: financialEvents.stripeEventId,
+          recorded_at: financialEvents.recordedAt,
+          user_email: users.email,
+          user_name: profiles.displayName,
+        })
+        .from(financialEvents)
+        .leftJoin(users, eq(users.id, financialEvents.userId))
+        .leftJoin(profiles, eq(profiles.id, financialEvents.userId))
+        .where(and(
+          gte(financialEvents.recordedAt, new Date(from)),
+          lte(financialEvents.recordedAt, new Date(to))
+        ))
+        .orderBy(desc(financialEvents.recordedAt));
 
       // Gera CSV
       const headers = ["ID", "Tipo", "Valor (BRL)", "Moeda", "Usuário", "Email", "Descrição", "Stripe Event ID", "Data"];
-      const rows = result.rows.map((r: any) => [
+      const rows = result.map((r: any) => [
         r.id,
         r.type,
         (Number(r.amount_cents) / 100).toFixed(2),
