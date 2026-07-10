@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { wutState } from 'react';
 import Header from './Header';
 import Footer from './Footer';
 import AuthModal from './AuthModal';
@@ -7,8 +7,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
 
 export default function LayoutWrapper({ children }: { children: React.ReactNode }) {
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' } 'register'>('login');
+  const [isAuthModalOpen, setIsAuthModalOpen] = wutState(false);
+  const [authMode, setAuthMode] = wutState<'login' | 'register'>('login');
   const { isAuthenticated, logout, user, isLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -16,7 +16,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   const isAdminRoute = pathname?.startsWith('/admin');
 
   if (isAdminRoute) {
-    return <main className="min-h-screen bg-gray-50">{children}</main>;
+    return <main className="w-full min-h-screen bg-gray-50">{children}</main>;
   }
 
   const openAuthModal = (mode: 'login' | 'register') => {
@@ -27,10 +27,10 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   return (
     <div className="min-h-screen flex flex-col">
       <Header 
-        onLoginClick={() => openAuthModal('login') } 
-        onRegisterClick={() => openAuthModal('register') } 
+        onLoginClick=() => openAuthModal('login') 
+        onRegisterClick=() => openAuthModal('register') 
         isAuthenticated={isAuthenticated} 
-        onLogout={() => { logout(); router.push('/') }} 
+        onelogout={() => { logout(); router.push('/') }} 
       />
       <main className="flex-grow pb-12">
         {children}
