@@ -13,6 +13,9 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   const router = useRouter();
   const pathname = usePathname();
 
+  // Identifica se é uma rota do CRM (Painel Administrativo)
+  const isAdminRoute = pathname?.startsWith('/admin');
+
   const openAuthModal = (mode: 'login' | 'register') => {
     setAuthMode(mode);
     setIsAuthModalOpen(true);
@@ -30,7 +33,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     if (authAction === 'login' || authAction === 'register') {
       setAuthMode(authAction);
       setIsAuthModalOpen(true);
-      
+
       // Limpa os parâmetros da URL sem recarregar
       const newUrl = window.location.pathname + window.location.search.replace(/[?&]auth=[^&]+/, '');
       window.history.replaceState({}, document.title, newUrl);
@@ -40,8 +43,8 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   // Redireciona usuários logados com pendências no cadastro (Primeiro Fotos, depois Perfil)
   React.useEffect(() => {
     const isPublicPage = ['/about', '/faq', '/terms', '/privacy', '/security', '/plans'].includes(pathname);
-    
-    if (!isLoading && isAuthenticated && user && !isPublicPage && pathname !== '/admin') {
+
+    if (!isLoading && isAuthenticated && user && !isPublicPage && !isAdminRoute) {
       if (user.hasPhotos === false) {
         if (pathname !== '/register/photos') {
           router.push('/register/photos');
@@ -52,10 +55,13 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
         }
       }
     }
-  }, [isLoading, isAuthenticated, user, pathname, router]);
+  }, [isLoading, isAuthenticated, user, pathname, router, isAdminRoute]);
 
-  // Menu sub-nav apenas para logados e não no admin?
-  const showSubNav = isAuthenticated && pathname !== '/admin';
+  // Se for rota administrativa, renderiza apenas o conteúdo. 
+  // O layout do admin já contém sua própria sidebar/header.
+  if (isAdminRoute) {
+    return <main className="min-h-screen">{children}</main>;
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -65,8 +71,6 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
         isAuthenticated={isAuthenticated} 
         onLogout={handleLogout} 
       />
-      
-
 
       <main className="flex-grow pb-12">
         {children}
