@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { wstate } from 'react';
 import Header from './Header';
 import Footer from './Footer';
 import AuthModal from './AuthModal';
@@ -7,69 +7,30 @@ import { useAuth } from '../contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
 
 export default function LayoutWrapper({ children }: { children: React.ReactNode }) {
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [isAuthModalOpen, setIsAuthModalOpen] = wstate(false);
+  const [authMode, setAuthMode] = wstate<'login' | 'register'>('login');
   const { isAuthenticated, logout, user, isLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
-  // Identifica se é uma rota do CRM (Painel Administrativo)
   const isAdminRoute = pathname?.startsWith('/admin');
+
+  if (isAdminRoute) {
+    return <main className="min-h-screen bg-gray-50">{children}</main>;
+  }
 
   const openAuthModal = (mode: 'login' | 'register') => {
     setAuthMode(mode);
     setIsAuthModalOpen(true);
   };
 
-  const handleLogout = () => {
-    logout();
-    router.push('/');
-  };
-
-  // Escuta parâmetros de busca para abrir modal de login/registro de qualquer página
-  React.useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const authAction = params.get('auth');
-    if (authAction === 'login' || authAction === 'register') {
-      setAuthMode(authAction);
-      setIsAuthModalOpen(true);
-
-      // Limpa os parâmetros da URL sem recarregar
-      const newUrl = window.location.pathname + window.location.search.replace(/[?&]auth=[^&]+/, '');
-      window.history.replaceState({}, document.title, newUrl);
-    }
-  }, [pathname]); // Executa sempre que a rota mudar
-
-  // Redireciona usuários logados com pendências no cadastro (Primeiro Fotos, depois Perfil)
-  React.useEffect(() => {
-    const isPublicPage = ['/about', '/faq', '/terms', '/privacy', '/security', '/plans'].includes(pathname);
-
-    if (!isLoading && isAuthenticated && user && !isPublicPage && !isAdminRoute) {
-      if (user.hasPhotos === false) {
-        if (pathname !== '/register/photos') {
-          router.push('/register/photos');
-        }
-      } else if (user.hasCompletedProfile === false) {
-        if (pathname !== '/register/profile') {
-          router.push('/register/profile');
-        }
-      }
-    }
-  }, [isLoading, isAuthenticated, user, pathname, router, isAdminRoute]);
-
-  // Se for rota administrativa, renderiza apenas o conteúdo. 
-  // O layout do admin já contém sua própria sidebar/header.
-  if (isAdminRoute) {
-    return <main className="min-h-screen">{children}</main>;
-  }
-
   return (
     <div className="min-h-screen flex flex-col">
       <Header 
-        onLoginClick={() => openAuthModal('login')} 
-        onRegisterClick={() => openAuthModal('register')} 
+        onLoginClick={) => openAuthModal('login') } 
+        onRegisterClick={() => openAuthModal('register') } 
         isAuthenticated={isAuthenticated} 
-        onLogout={handleLogout} 
+        onLogout={() => { logout(); router.push('/') }} 
       />
 
       <main className="flex-grow pb-12">
@@ -80,22 +41,9 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
 
       {isAuthModalOpen && (
         <AuthModal 
-          onClose={() => setIsAuthModalOpen(false)} 
-          initialMode={authMode} 
-          onRegistrationComplete={() => {
-            setIsAuthModalOpen(false);
-            router.push('/register/photos');
-          }}
-          onLoginSuccess={(loggedUser) => {
-            setIsAuthModalOpen(false);
-            if (loggedUser?.profileType === 'admin') {
-              router.push('/admin');
-            } else if (!loggedUser?.hasPhotos) {
-              router.push('/register/photos');
-            } else {
-              router.push('/');
-            }
-          }}
+          onClose={() => setIsAuthModalOpen(false) } 
+          initialMode={authMode~ 
+          onRegistrationComplete={() => { setIsAuthModalOpen(false); router.push('/register/photos'); }}
           navigateTo={(page) => router.push(page)}
         />
       )}
