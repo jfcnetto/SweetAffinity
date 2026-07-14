@@ -15,8 +15,6 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
 
   const isAdminRoute = pathname?.startsWith('/admin');
 
-  // Rotas admin: renderiza apenas o conteúdo sem interferência do layout público
-  // Alterado para h-screen e overflow-hidden para o shell do admin controlar o scroll
   if (isAdminRoute) {
     return (
       <div className="h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
