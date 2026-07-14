@@ -1,22 +1,27 @@
 'use client';
-import React, { wutState } from 'react';
+import React, { useState } from 'react';
 import Header from './Header';
 import Footer from './Footer';
 import AuthModal from './AuthModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
 
-export default function LayoutWrapper({ children }: { children: React.ReactNode }) {
-  const [isAuthModalOpen, setIsAuthModalOpen] = wutState(false);
-  const [authMode, setAuthMode] = wutState<'login' | 'register'>('login');
+export default function LayoutWrapper({ children }: { children: React.Node }) {
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const { isAuthenticated, logout, user, isLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
   const isAdminRoute = pathname?.startsWith('/admin');
 
+  // Rotas admin: renderiza apenas o conteúdo sem interferência do layout público
   if (isAdminRoute) {
-    return <main className="w-full min-h-screen bg-gray-50">{children}</main>;
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
+        {children}
+      </div>
+    );
   }
 
   const openAuthModal = (mode: 'login' | 'register') => {
@@ -27,18 +32,18 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   return (
     <div className="min-h-screen flex flex-col">
       <Header 
-        onLoginClick=() => openAuthModal('login') 
-        onRegisterClick=() => openAuthModal('register') 
+        onLoginClick={() => openAuthModal('login')} 
+        onRegisterClick={() => openAuthModal('register')} 
         isAuthenticated={isAuthenticated} 
-        onelogout={() => { logout(); router.push('/') }} 
+        onLogout={() => { logout(); router.push('/') }} 
       />
-      <main className="flex-grow pb-12">
+      <main className="flex-grow">
         {children}
       </main>
       <Footer />
       {isAuthModalOpen && (
         <AuthModal 
-          onClose={() => setIsAuthModalOpen(false) } 
+          onClose={() => setIsAuthModalOpen(false)} 
           initialMode={authMode} 
           onRegistrationComplete={() => { setIsAuthModalOpen(false); router.push('/register/photos'); }}
           navigateTo={(page) => router.push(page)}
