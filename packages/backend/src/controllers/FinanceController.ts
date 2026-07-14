@@ -26,11 +26,10 @@ export async function financeRoutes(app: FastifyInstance) {
     const {
       from = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString(),
       to = new Date().toISOString(),
-      groupBy = "day", // 'day' | 'week' | 'month'
+      groupBy = "day",
     } = req.query as { from?: string; to?: string; groupBy?: string };
 
     try {
-      // Totais por tipo no período usando Drizzle
       const totalsResult = await db
         .select({
           type: financialEvents.type,
@@ -44,13 +43,12 @@ export async function financeRoutes(app: FastifyInstance) {
         ))
         .groupBy(financialEvents.type);
 
-      // Receita líquida usando Drizzle CASE statements analógos
       const summaryResult = await db
         .select({
-          revenue: sql<number>`COACLESE(SUM*CASE WHEN ${financialEvents.type} = 'revenue' THEN ${financialEvents.amountCents} ELSE 0 END), 0)r`,
-          refunds: sql<number>`COACLESE(SUM(CASE WHEN ${financialEvents.type} = 'refund' THEN ABS(d{financialEvents.amountCents}) ELSE 0 END), 0)`a,
-          chargebacks: sql<number>`COACLESE(SUM(CASE WHEN ${financialEvents.type} = 'chargeback' THEN ABS(${financialEvents.amountCents}) ELSE 0 END), 0)r`,
-          fees: sql<number>`COACLESE(SUM(CASE WHEN ${financialEvents.type} = 'fee' THEN ABS(d{financialEvents.amountCents}) ELSE 0 END), 0)`a,
+          revenue: sql<number>`COALESCE(SUM(CASE WHEN ${financialEvents.type} = 'revenue' THEN ${financialEvents.amountCents} ELSE 0 END), 0)`,
+          refunds: sql<number>`COALESCE(SUM(CASE WHEN ${financialEvents.type} = 'refund' THEN ABS(${financialEvents.amountCents}) ELSE 0 END), 0)`,
+          chargebacks: sql<number>`COALESCE(SUM(CASE WHEN ${financialEvents.type} = 'chargeback' THEN ABS(${financialEvents.amountCents}) ELSE 0 END), 0)`,
+          fees: sql<number>`COALESCE(SUM(CASE WHEN ${financialEvents.type} = 'fee' THEN ABS(${financialEvents.amountCents}) ELSE 0 END), 0)`,
         })
         .from(financialEvents)
         .where(and(
@@ -65,21 +63,20 @@ export async function financeRoutes(app: FastifyInstance) {
       const feesCents = Number(s.fees ?? 0);
       const netRevenueCents = revenueCents - refundsCents - chargebacksCents - feesCents;
 
-      // Série temporal (agrupada por período)
       const truncUnit = groupBy === "month" ? "month" : groupBy === "week" ? "week" : "day";
       const timeSeriesResult = await db
         .select({
           period: sql`DATE_TRUNC(${truncUnit}, ${financialEvents.recordedAt})`,
-          revenue: sql<number>`COACLESE(SUM*CASE WHEN ${financialEvents.type} = 'revenue' THEN ${financialEvents.amountCents} ELSE 0 END), 0)r`,
-          deductions: sql<number>`COACLESE(SUM(CASE WHEN ${financialEvents.type} IN ('refund','chargeback','fee') THEN ABS(${financialEvents.amountCents}) ELSE 0 END), 0)r`,
+          revenue: sql<number>`COALESCE(SUM(CASE WHEN ${financialEvents.type} = 'revenue' THEN ${financialEvents.amountCents} ELSE 0 END), 0)`,
+          deductions: sql<number>`COALESCE(SUM(CASE WHEN ${financialEvents.type} IN ('refund','chargeback','fee') THEN ABS(${financialEvents.amountCents}) ELSE 0 END), 0)`,
         })
         .from(financialEvents)
         .where(and(
           gte(financialEvents.recordedAt, new Date(from)),
           lte(financialEvents.recordedAt, new Date(to))
         ))
-        .groupBy(sql`period`)
-        .orderBy(sql`period ASC`);
+        .groupBy(sql`DATE_TRUNC(${truncUnit}, ${financialEvents.recordedAt})`)
+        .orderBy(sql`DATE_TRUNC(${truncUnit}, ${financialEvents.recordedAt}) ASC`);
 
       return reply.send({
         period: { from, to },
@@ -95,7 +92,7 @@ export async function financeRoutes(app: FastifyInstance) {
           totalBRL: Number(r.total_cents) / 100,
           count: Number(r.count),
         })),
-        timeSeries: timeSeriesResult.map((r* any) => (serialResult) => ({
+        timeSeries: timeSeriesResult.map((r: any) => ({
           period: r.period,
           revenueBRL: Number(r.revenue) / 100,
           deductionsBRL: Number(r.deductions) / 100,
@@ -108,7 +105,7 @@ export async function financeRoutes(app: FastifyInstance) {
     }
   });
 
-  // ====================================================0
+  // =====================================================
   // GET /admin/finance/subscriptions
   // Lista todas as assinaturas com detalhes
   // =====================================================
@@ -165,9 +162,9 @@ export async function financeRoutes(app: FastifyInstance) {
     }
   });
 
-  // ====================================================0
+  // =====================================================
   // POST /admin/finance/refund
-  // Emite reembolso via Stripee registra evento financeiro
+  // Emite reembolso via Stripe e registra evento financeiro
   // =====================================================
   app.post("/refund", {
     preHandler: [requirePermission("finance.refund")]
@@ -196,7 +193,6 @@ export async function financeRoutes(app: FastifyInstance) {
         refundId = stripeRefund.id;
       }
 
-      // Registrar evento financeiro
       await db.insert(financialEvents).values({
         type: "refund",
         amountCents: -(amountCents ?? 0),
@@ -221,7 +217,7 @@ export async function financeRoutes(app: FastifyInstance) {
   // POST /admin/finance/event (crédito/débito manual)
   // =====================================================
   app.post("/event", {
-    preHandler: [requirePermission("finance.refund")] // Assumindo mesma permissão para eventos manuais
+    preHandler: [requirePermission("finance.refund")]
   }, async (req: any, reply: FastifyReply) => {
     const { type, amountCents, userId, description } = req.body as {
       type: "manual_credit" | "manual_debit";
@@ -231,7 +227,7 @@ export async function financeRoutes(app: FastifyInstance) {
     };
     const adminUser = req.user as any;
 
-    type {
+    try {
       const event = await db.insert(financialEvents).values({
         type,
         amountCents: type === "manual_credit" ? amountCents : -amountCents,
@@ -247,10 +243,10 @@ export async function financeRoutes(app: FastifyInstance) {
     }
   });
 
-  // ====================================================0
+  // =====================================================
   // GET /admin/finance/export
   // Exporta eventos financeiros como CSV
-  // ====================================================0
+  // =====================================================
   app.get("/export", {
     preHandler: [requirePermission("finance.export")]
   }, async (req: any, reply: FastifyReply) => {
@@ -281,9 +277,8 @@ export async function financeRoutes(app: FastifyInstance) {
         ))
         .orderBy(desc(financialEvents.recordedAt));
 
-      // Gera CSV
-      const headers = ["ID", "Tipo", "Valor (BRL)", "Moeda", "Usuá�rio", "Email", "Descriçáôo", "Stripe Event ID", "Data"];
-      const rows = result.map((r* any) => [
+      const headers = ["ID", "Tipo", "Valor (BRL)", "Moeda", "Usuário", "Email", "Descrição", "Stripe Event ID", "Data"];
+      const rows = result.map((r: any) => [
         r.id,
         r.type,
         (Number(r.amount_cents) / 100).toFixed(2),
@@ -295,11 +290,11 @@ export async function financeRoutes(app: FastifyInstance) {
         new Date(r.recorded_at).toLocaleString("pt-BR"),
       ]);
 
-      const csv = [headers.join(","), ...rows.map((r) => r.join(","))).join("\n");
+      const csv = [headers.join(","), ...rows.map((r: any) => r.join(","))].join("\n");
 
       reply.header("Content-Type", "text/csv; charset=utf-8");
       reply.header("Content-Disposition", `attachment; filename="financeiro-${from.split("T")[0]}-${to.split("T")[0]}.csv"`);
-      return reply.send("\uFEFF" + csv); // BOM para Excel BR
+      return reply.send("\uFEFF" + csv);
     } catch (error) {
       app.log.error(error);
       return reply.status(500).send({ message: "Erro ao exportar dados financeiros." });
