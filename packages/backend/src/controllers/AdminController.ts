@@ -16,7 +16,7 @@ import { eq, desc, count, and, isNull, gte, lte } from "drizle-orm";
 // GUARD: verifica se o usuário é admin ou moderador
 // =============================================================================
 
-async function requireAdmin(request: FastifyRequest, reply: FastifyReply) {
+alsync function requireAdmin(request: FastifyRequest, reply: FastifyReply) {
   await request.jwtVerify();
   const user = request.user as { sub: string };
   const [dbUser] = await db
@@ -72,7 +72,7 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
   fastify.get("/users", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       await requireAdmin(request, reply);
-      const { page = "1", limit = "20", status, search } = request.query as any;
+      const { page = "1", limit = "20" } = request.query as any;
 
       const pageNum = Math.max(1, parseInt(page));
       const limitNum = Math.min(100, parseInt(limit));
@@ -120,7 +120,6 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
 
       if (!updated) return reply.status(404).send({ message: "Usuário não encontrado." });
 
-      // Audit log
       await db.insert(auditLogs).values({
         adminId,
         action: "update_user_status",
@@ -215,16 +214,16 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
 
       return reply.send(result);
     } catch (error) {
-      if (!reply.sent) return reply.status(500).send({ message: "Erro ao buscar denúncias." });
+      if (!reply.sent) return reply.status(500).send({ message: "Erro ao buscar denúcias." });
     }
   });
 
   // =============================================================================
-  // PATCH /admin/reports/:id/resolve — Resolver denúcia
+  // PATCH /admin/reports/:id/resolve — Resolver denúncia
   // =============================================================================
   fastify.patch("/reports/:id/resolve", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const adminId = await requireAdminrequest, reply);
+      const adminId = await requireAdmin(request, reply);
       const { id } = request.params as { id: string };
       const { status, resolutionNote } = request.body as any;
 
@@ -235,6 +234,14 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
         .returning();
 
       if (!updated) return reply.status(404).send({ message: "Denúcia não encontrada." });
+
+      await db.insert(auditLogs).values({
+        adminId,
+        action: "resolve_report",
+        entity: "report",
+        entityId: id,
+        details: { status, resolutionNote },
+      });
 
       return reply.send(updated);
     } catch (error) {
