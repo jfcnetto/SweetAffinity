@@ -6,7 +6,7 @@ import AuthModal from './AuthModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
 
-export default function LayoutWrapper({ children }: { children: React.Node }) {
+export default function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const { isAuthenticated, logout, user, isLoading } = useAuth();
@@ -16,9 +16,10 @@ export default function LayoutWrapper({ children }: { children: React.Node }) {
   const isAdminRoute = pathname?.startsWith('/admin');
 
   // Rotas admin: renderiza apenas o conteúdo sem interferência do layout público
+  // Alterado para h-screen e overflow-hidden para o shell do admin controlar o scroll
   if (isAdminRoute) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
+      <div className="h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
         {children}
       </div>
     );
