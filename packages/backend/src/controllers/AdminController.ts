@@ -10,13 +10,13 @@ import {
   subscriptions,
   profileModerationQueue,
 } from "../db/schema.js";
-import { eq, desc, count, and, isNull, gte, lte } from "drizle-orm";
+import { eq, desc, count, and, isNull, gte, lte } from "drizzle-orm";
 
 // =============================================================================
 // GUARD: verifica se o usuário é admin ou moderador
 // =============================================================================
 
-alsync function requireAdmin(request: FastifyRequest, reply: FastifyReply) {
+async function requireAdmin(request: FastifyRequest, reply: FastifyReply) {
   await request.jwtVerify();
   const user = request.user as { sub: string };
   const [dbUser] = await db
@@ -52,6 +52,7 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
       const [totalPendingPhotos] = await db.select({ value: count() }).from(photos).where(eq(photos.status, "pending"));
       const [totalPendingReports] = await db.select({ value: count() }).from(reports).where(eq(reports.status, "pending"));
       const [totalSubs] = await db.select({ value: count() }).from(subscriptions).where(eq(subscriptions.status, "active"));
+      const [totalPendingProfiles] = await db.select({ value: count() }).from(profileModerationQueue).where(eq(profileModerationQueue.status, "pending"));
 
       return reply.send({
         totalUsers: totalUsers.value,
@@ -60,6 +61,7 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
         pendingPhotos: totalPendingPhotos.value,
         pendingReports: totalPendingReports.value,
         activeSubscriptions: totalSubs.value,
+        pendingProfiles: totalPendingProfiles.value,
       });
     } catch (error) {
       if (!reply.sent) return reply.status(500).send({ message: "Erro ao buscar dashboard." });
@@ -199,6 +201,114 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
   });
 
   // =============================================================================
+  // GET /admin/moderation/profiles — Fila de moderação de perfis
+  // =============================================================================
+  fastify.get("/moderation/profiles", async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      await requireAdmin(request, reply);
+      const { status = "pending" } = request.query as any;
+
+      const result = await db
+        .select({
+          id: profileModerationQueue.id,
+          userId: profileModerationQueue.userId,
+          status: profileModerationQueue.status,
+          submittedAt: profileModerationQueue.submittedAt,
+          reviewedAt: profileModerationQueue.reviewedAt,
+          reviewedBy: profileModerationQueue.reviewedBy,
+          rejectionReason: profileModerationQueue.rejectionReason,
+          displayName: profiles.displayName,
+          bio: profiles.bio,
+          relationshipType: profiles.relationshipType,
+        })
+        .from(profileModerationQueue)
+        .leftJoin(profiles, eq(profileModerationQueue.userId, profiles.id))
+        .where(eq(profileModerationQueue.status, status as any))
+        .orderBy(desc(profileModerationQueue.submittedAt));
+
+      return reply.send(result);
+    } catch (error) {
+      if (!reply.sent) return reply.status(500).send({ message: "Erro ao buscar fila de perfis." });
+    }
+  });
+
+  // =============================================================================
+  // POST /admin/moderation/:id/approve — Aprovar perfil
+  // =============================================================================
+  fastify.post("/moderation/:id/approve", async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const adminId = await requireAdmin(request, reply);
+      const { id } = request.params as { id: string };
+
+      const [queue] = await db
+        .select()
+        .from(profileModerationQueue)
+        .where(eq(profileModerationQueue.id, id));
+
+      if (!queue) return reply.status(404).send({ message: "Item de moderação não encontrado." });
+
+      const [updated] = await db
+        .update(profileModerationQueue)
+        .set({ status: "approved", reviewedBy: adminId, reviewedAt: new Date() })
+        .where(eq(profileModerationQueue.id, id))
+        .returning();
+
+      await db.insert(auditLogs).values({
+        adminId,
+        action: "approve_profile",
+        entity: "profile_moderation_queue",
+        entityId: id,
+        details: { userId: queue.userId },
+      });
+
+      return reply.send({ success: true, item: updated });
+    } catch (error) {
+      if (!reply.sent) return reply.status(500).send({ message: "Erro ao aprovar perfil." });
+    }
+  });
+
+  // =============================================================================
+  // POST /admin/moderation/:id/reject — Rejeitar perfil
+  // =============================================================================
+  fastify.post("/moderation/:id/reject", async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const adminId = await requireAdmin(request, reply);
+      const { id } = request.params as { id: string };
+      const { reason } = request.body as { reason?: string };
+
+      const [queue] = await db
+        .select()
+        .from(profileModerationQueue)
+        .where(eq(profileModerationQueue.id, id));
+
+      if (!queue) return reply.status(404).send({ message: "Item de moderação não encontrado." });
+
+      const [updated] = await db
+        .update(profileModerationQueue)
+        .set({
+          status: "rejected",
+          reviewedBy: adminId,
+          reviewedAt: new Date(),
+          rejectionReason: reason ?? "Perfil não atende às diretrizes da plataforma.",
+        })
+        .where(eq(profileModerationQueue.id, id))
+        .returning();
+
+      await db.insert(auditLogs).values({
+        adminId,
+        action: "reject_profile",
+        entity: "profile_moderation_queue",
+        entityId: id,
+        details: { userId: queue.userId, reason },
+      });
+
+      return reply.send({ success: true, item: updated });
+    } catch (error) {
+      if (!reply.sent) return reply.status(500).send({ message: "Erro ao rejeitar perfil." });
+    }
+  });
+
+  // =============================================================================
   // GET /admin/reports — Listagem de denúncias
   // =============================================================================
   fastify.get("/reports", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -233,7 +343,7 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
         .where(eq(reports.id, id))
         .returning();
 
-      if (!updated) return reply.status(404).send({ message: "Denúcia não encontrada." });
+      if (!updated) return reply.status(404).send({ message: "Denúncia não encontrada." });
 
       await db.insert(auditLogs).values({
         adminId,
