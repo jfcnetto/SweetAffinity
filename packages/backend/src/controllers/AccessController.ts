@@ -240,7 +240,7 @@ export async function accessRoutes(app: FastifyInstance) {
           userId: userSpecialAccess.userId,
           grantedBy: userSpecialAccess.grantedBy,
           reason: userSpecialAccess.reason,
-          expiresAt: userSpecialAccess.expiresAt,
+          validUntil: userSpecialAccess.validUntil,
           createdAt: userSpecialAccess.createdAt,
           userEmail: users.email,
           userDisplayName: profiles.displayName,
