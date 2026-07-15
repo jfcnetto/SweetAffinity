@@ -43,7 +43,7 @@ export const photoRoutes = async (fastify: FastifyInstance) => {
         await s3Client.send(new CreateBucketCommand({ Bucket: BUCKET_NAME }));
         fastify.log.info(`Sucesso: Bucket "${BUCKET_NAME}" criado.`);
       } catch (createErr) {
-        fastify.log.error(`Erro crítico ao tentar criar o bucket "${BUCKET_NAME}":`, createErr);
+        fastify.log.error({ err: createErr }, `Erro crítico ao tentar criar o bucket "${BUCKET_NAME}":`);
       }
     } else {
       fastify.log.error(`Erro ao verificar a saúde do bucket "${BUCKET_NAME}":`, err);
@@ -72,7 +72,7 @@ export const photoRoutes = async (fastify: FastifyInstance) => {
     );
     fastify.log.info(`✅ Política de leitura pública (Public Read) aplicada ao bucket "${BUCKET_NAME}".`);
   } catch (policyErr) {
-    fastify.log.error(`Erro ao aplicar política pública ao bucket "${BUCKET_NAME}":`, policyErr);
+    fastify.log.error({ err: policyErr }, `Erro ao aplicar política pública ao bucket "${BUCKET_NAME}":`);
   }
 
   // =====================================================

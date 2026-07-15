@@ -299,7 +299,7 @@ export async function subscriptionRoutes(app: FastifyInstance) {
 
           if (userId && stripeSubscriptionId) {
             const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
-            const periodEnd = new Date(stripeSub.current_period_end * 1000);
+            const periodEnd = new Date((stripeSub as any).current_period_end * 1000);
             
             const priceId = stripeSub.items.data[0]?.price.id;
             const amount = stripeSub.items.data[0]?.plan?.amount || 0;
@@ -328,7 +328,7 @@ export async function subscriptionRoutes(app: FastifyInstance) {
 
         if (event.type === "customer.subscription.updated") {
           const stripeSub = event.data.object as Stripe.Subscription;
-          const periodEnd = new Date(stripeSub.current_period_end * 1000);
+          const periodEnd = new Date((stripeSub as any).current_period_end * 1000);
 
           await db
             .update(subscriptions)

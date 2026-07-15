@@ -8,8 +8,8 @@ import {
   profiles,
   notifications,
   subscriptions,
-} from "../db/index.js";
-import { eq, and, desc, alias } from "drizzle-orm";
+} from "../db/schema.js";
+import { eq, and, desc } from "drizzle-orm";
 import { requirePermission, invalidatePermissionCache } from "../middleware/rbac.js";
 
 // Permissões padrão por role

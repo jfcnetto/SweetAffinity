@@ -211,9 +211,9 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
       const result = await db
         .select({
           id: profileModerationQueue.id,
-          userId: profileModerationQueue.userId,
+          profileId: profileModerationQueue.profileId,
           status: profileModerationQueue.status,
-          submittedAt: profileModerationQueue.submittedAt,
+          createdAt: profileModerationQueue.createdAt,
           reviewedAt: profileModerationQueue.reviewedAt,
           reviewedBy: profileModerationQueue.reviewedBy,
           rejectionReason: profileModerationQueue.rejectionReason,
@@ -222,9 +222,9 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
           relationshipType: profiles.relationshipType,
         })
         .from(profileModerationQueue)
-        .leftJoin(profiles, eq(profileModerationQueue.userId, profiles.id))
+        .leftJoin(profiles, eq(profileModerationQueue.profileId, profiles.id))
         .where(eq(profileModerationQueue.status, status as any))
-        .orderBy(desc(profileModerationQueue.submittedAt));
+        .orderBy(desc(profileModerationQueue.createdAt));
 
       return reply.send(result);
     } catch (error) {
@@ -258,7 +258,7 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
         action: "approve_profile",
         entity: "profile_moderation_queue",
         entityId: id,
-        details: { userId: queue.userId },
+        details: { profileId: queue.profileId },
       });
 
       return reply.send({ success: true, item: updated });
@@ -299,7 +299,7 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
         action: "reject_profile",
         entity: "profile_moderation_queue",
         entityId: id,
-        details: { userId: queue.userId, reason },
+        details: { profileId: queue.profileId, reason },
       });
 
       return reply.send({ success: true, item: updated });

@@ -189,10 +189,10 @@ export const profileRoutes = async (fastify: FastifyInstance) => {
           filtered = filtered.filter(p => {
             if (!p.latitude || !p.longitude) return false;
             const dist = getDistanceKm(
-              parseFloat(currentUser.latitude),
-              parseFloat(currentUser.longitude),
-              parseFloat(p.latitude),
-              parseFloat(p.longitude)
+              currentUser.latitude!,
+              currentUser.longitude!,
+              p.latitude,
+              p.longitude
             );
             return dist <= radiusNum;
           });

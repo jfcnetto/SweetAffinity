@@ -129,7 +129,7 @@ Retorne a resposta no seguinte formato JSON estrito, sem decorações markdown c
       });
 
       if (response.ok) {
-        const data = await response.json();
+        const data = (await response.json()) as any;
         const responseText = data.choices?.[0]?.message?.content;
         if (responseText) {
           let cleanText = responseText.trim();
