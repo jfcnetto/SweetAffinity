@@ -118,3 +118,7 @@ export interface FaqItem {
   question: string;
   answer: string;
 }
+
+export interface FilterCriteria {
+  [key: string]: any;
+}
