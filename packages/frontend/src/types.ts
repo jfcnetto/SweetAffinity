@@ -42,6 +42,17 @@ export interface Profile {
   profile_views: number;
   is_active: boolean;
   updated_at: string;
+  isPremium?: boolean;
+  displayName?: string;
+  primaryPhotoUrl?: string;
+  relationshipType?: string;
+  birthDate?: string;
+  createdAt?: string;
+  name?: string;
+  age?: number | string;
+  isVerified?: boolean;
+  location?: string;
+  imageUrls?: string[];
   
   // Relações acopladas que seu frontend usa nos cards
   primary_photo_url?: string;
