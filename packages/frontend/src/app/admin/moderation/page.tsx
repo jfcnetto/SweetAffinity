@@ -112,7 +112,7 @@ export default function ModerationQueuePage() {
                 <div className="space-y-4 flex-1">
                   <div className="flex items-center gap-3 flex-wrap">
                     <h3 className="text-xl font-bold text-slate-950">{profile.displayName}</h3>
-                    <Badge variant="secondary" className="capitalize">
+                    <Badge variant="neutral" className="capitalize">
                       {profile.relationshipType === 'baby' ? 'Sugar Baby' : profile.relationshipType === 'daddy' ? 'Sugar Daddy' : 'Sugar Mommy'}
                     </Badge>
                     <span className="text-slate-400 text-xs">
