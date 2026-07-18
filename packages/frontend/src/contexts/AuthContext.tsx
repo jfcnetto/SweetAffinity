@@ -116,8 +116,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const urlRefreshToken = params.get('refresh_token');
 
     if (urlAccessToken && urlRefreshToken) {
-      window.history.replaceState({}, document.title, window.location.pathname);
+      // Limpa os tokens da URL e loga o usuário
       login(urlAccessToken, urlRefreshToken);
+      
+      // Redireciona o usuário para a área interna (Matches)
+      window.location.href = '/matches';
       return;
     }
 
