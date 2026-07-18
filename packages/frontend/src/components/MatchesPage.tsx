@@ -80,7 +80,7 @@ export default function MatchesPage() {
           isPremiumUser={user.isPremium || false}
           navigateTo={(page) => console.log('Navigate to:', page)}
           currentUserType={user.relationshipType as any}
-          currentUserId={user.id}
+          currentUserId={user.id as string}
         />
       )}
     </div>
