@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -9,7 +9,7 @@ import { Button } from '../../../design-system/components/Button';
 import { toast } from '../../../design-system/components/Toast';
 import { CheckCircle2, ShieldCheck, ArrowRight } from 'lucide-react';
 
-export default function PremiumSuccessPage() {
+function PremiumSuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('session_id');
@@ -79,5 +79,13 @@ export default function PremiumSuccessPage() {
         )}
       </Card>
     </div>
+  );
+}
+
+export default function PremiumSuccessPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Carregando...</div>}>
+      <PremiumSuccessContent />
+    </Suspense>
   );
 }
