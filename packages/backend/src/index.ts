@@ -166,7 +166,7 @@ async function start() {
       // startRedirectPath: URL que o frontend vai chamar para iniciar o fluxo
       startRedirectPath: '/auth/google',
       // callbackUri: URL registrada no Google Cloud Console
-      callbackUri: 'http://localhost:4000/auth/google/callback',
+      callbackUri: process.env.RENDER_EXTERNAL_URL ? `${process.env.RENDER_EXTERNAL_URL}/auth/google/callback` : 'http://localhost:4000/auth/google/callback',
       scope: ['profile', 'email']
     });
 
