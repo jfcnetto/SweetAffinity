@@ -49,6 +49,8 @@ interface Profile {
   seekingGender?: string;
   travelPreference?: string;
   photos?: any[];
+  isPremium?: boolean;
+  primaryPhotoUrl?: string;
 }
 
 export default function ProfileDetailPage() {
