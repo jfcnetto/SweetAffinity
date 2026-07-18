@@ -122,3 +122,10 @@ export interface FaqItem {
 export interface FilterCriteria {
   [key: string]: any;
 }
+
+export interface Article {
+  id: string | number;
+  title: string;
+  summary: string;
+  imageUrl: string;
+}
