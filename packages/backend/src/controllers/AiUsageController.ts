@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyReply } from "fastify";
 import { db } from "../db/index.js";
 import { aiUsageLogs, aiBudgetConfig, notifications, users } from "../db/schema.js";
-import { eq, sql, and } from "drizzle-orm";
+import { eq, and, gte, lte, desc, sum, count, avg } from "drizzle-orm";
 import { requirePermission } from "../middleware/rbac.js";
 
 // Tabela de preços por modelo (USD por 1M tokens)
@@ -85,14 +85,18 @@ async function checkBudgetAlert(service: string) {
 
     if (!budget || !budget.isEnabled) return;
 
-    const todayResult = await db.execute(sql`
-      SELECT COALESCE(SUM(cost_usd), 0) as total
-      FROM ai_usage_logs
-      WHERE service = ${service}
-        AND created_at >= CURRENT_DATE
-    `);
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
 
-    const totalToday = Number(todayResult.rows[0]?.total ?? 0);
+    const [todayResult] = await db
+      .select({ total: sum(aiUsageLogs.costUsd) })
+      .from(aiUsageLogs)
+      .where(and(
+         eq(aiUsageLogs.service, service),
+         gte(aiUsageLogs.createdAt, startOfToday)
+      ));
+
+    const totalToday = Number(todayResult?.total ?? 0);
     const usedPercent = (totalToday / budget.dailyLimitUsd) * 100;
 
     if (usedPercent >= budget.alertThreshold) {
@@ -143,27 +147,28 @@ export async function aiUsageRoutes(app: FastifyInstance) {
     };
 
     try {
-      const conditions = [`created_at BETWEEN '${from}' AND '${to}'`];
-      if (service) conditions.push(`service = '${service}'`);
-      if (feature) conditions.push(`feature = '${feature}'`);
-      const where = conditions.join(" AND ");
+      const conditions = [];
+      conditions.push(gte(aiUsageLogs.createdAt, new Date(from)));
+      conditions.push(lte(aiUsageLogs.createdAt, new Date(to)));
+      if (service) conditions.push(eq(aiUsageLogs.service, service));
+      if (feature) conditions.push(eq(aiUsageLogs.feature, feature));
 
-      const result = await db.execute(sql.raw(`
-        SELECT id, service, model, feature, prompt_tokens, completion_tokens,
-               total_tokens, cost_usd, cost_brl, status, latency_ms, created_at
-        FROM ai_usage_logs
-        WHERE ${where}
-        ORDER BY created_at DESC
-        LIMIT ${Number(limit)} OFFSET ${Number(offset)}
-      `));
+      const logsResult = await db
+        .select()
+        .from(aiUsageLogs)
+        .where(and(...conditions))
+        .orderBy(desc(aiUsageLogs.createdAt))
+        .limit(Number(limit))
+        .offset(Number(offset));
 
-      const totalResult = await db.execute(sql.raw(`
-        SELECT count(*) FROM ai_usage_logs WHERE ${where}
-      `));
+      const [totalResult] = await db
+        .select({ total: count() })
+        .from(aiUsageLogs)
+        .where(and(...conditions));
 
       return reply.send({
-        data: result.rows,
-        total: Number(totalResult.rows[0].count),
+        data: logsResult,
+        total: Number(totalResult?.total ?? 0),
         limit: Number(limit),
         offset: Number(offset),
       });
@@ -187,103 +192,127 @@ export async function aiUsageRoutes(app: FastifyInstance) {
     const days = period === "7d" ? 7 : period === "90d" ? 90 : 30;
 
     try {
-      // Custo total hoje
-      const todayResult = await db.execute(sql`
-        SELECT
-          COALESCE(SUM(cost_usd), 0) as cost_usd,
-          COALESCE(SUM(cost_brl), 0) as cost_brl,
-          COALESCE(SUM(total_tokens), 0) as total_tokens,
-          COUNT(*) as calls
-        FROM ai_usage_logs
-        WHERE created_at >= CURRENT_DATE
-      `);
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
 
-      // Custo este mês
-      const monthResult = await db.execute(sql`
-        SELECT
-          COALESCE(SUM(cost_usd), 0) as cost_usd,
-          COALESCE(SUM(cost_brl), 0) as cost_brl,
-          COALESCE(SUM(total_tokens), 0) as total_tokens
-        FROM ai_usage_logs
-        WHERE created_at >= DATE_TRUNC('month', NOW())
-      `);
+      const [todayResult] = await db
+        .select({
+          costUsd: sum(aiUsageLogs.costUsd),
+          costBrl: sum(aiUsageLogs.costBrl),
+          totalTokens: sum(aiUsageLogs.totalTokens),
+          calls: count(),
+        })
+        .from(aiUsageLogs)
+        .where(gte(aiUsageLogs.createdAt, startOfToday));
 
-      // Por serviço no período
-      const byServiceResult = await db.execute(sql`
-        SELECT
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+
+      const [monthResult] = await db
+        .select({
+          costUsd: sum(aiUsageLogs.costUsd),
+          costBrl: sum(aiUsageLogs.costBrl),
+          totalTokens: sum(aiUsageLogs.totalTokens),
+        })
+        .from(aiUsageLogs)
+        .where(gte(aiUsageLogs.createdAt, startOfMonth));
+
+      const periodStart = new Date();
+      periodStart.setDate(periodStart.getDate() - days);
+
+      // Usando Drizzle puro para byService
+      const byServiceQuery = await db
+        .select({
+          service: aiUsageLogs.service,
+          model: aiUsageLogs.model,
+          costUsd: sum(aiUsageLogs.costUsd),
+          costBrl: sum(aiUsageLogs.costBrl),
+          totalTokens: sum(aiUsageLogs.totalTokens),
+          calls: count(),
+          avgLatencyMs: avg(aiUsageLogs.latencyMs)
+        })
+        .from(aiUsageLogs)
+        .where(gte(aiUsageLogs.createdAt, periodStart))
+        .groupBy(aiUsageLogs.service, aiUsageLogs.model);
+      
+      byServiceQuery.sort((a, b) => Number(b.costUsd ?? 0) - Number(a.costUsd ?? 0));
+
+      // Buscar todos do periodo para processar byFeature e timeSeries em memória sem DATE_TRUNC
+      const allPeriodLogs = await db
+        .select({
+          service: aiUsageLogs.service,
+          feature: aiUsageLogs.feature,
+          costUsd: aiUsageLogs.costUsd,
+          totalTokens: aiUsageLogs.totalTokens,
+          createdAt: aiUsageLogs.createdAt
+        })
+        .from(aiUsageLogs)
+        .where(gte(aiUsageLogs.createdAt, periodStart));
+
+      // By Feature
+      const featureMap = new Map<string, { costUsd: number; calls: number }>();
+      // Time Series
+      const timeSeriesMap = new Map<string, { costUsd: number; totalTokens: number }>();
+
+      for (const log of allPeriodLogs) {
+        const costUsd = Number(log.costUsd ?? 0);
+        
+        // Feature logic
+        const feature = log.feature || "unknown";
+        if (!featureMap.has(feature)) featureMap.set(feature, { costUsd: 0, calls: 0 });
+        const featStats = featureMap.get(feature)!;
+        featStats.costUsd += costUsd;
+        featStats.calls += 1;
+
+        // TimeSeries logic
+        const dateKey = new Date(log.createdAt).toISOString().split("T")[0]; // YYYY-MM-DD
+        const tsKey = `${dateKey}_${log.service}`;
+        if (!timeSeriesMap.has(tsKey)) timeSeriesMap.set(tsKey, { costUsd: 0, totalTokens: 0 });
+        const tsStats = timeSeriesMap.get(tsKey)!;
+        tsStats.costUsd += costUsd;
+        tsStats.totalTokens += Number(log.totalTokens ?? 0);
+      }
+
+      const byFeatureResult = Array.from(featureMap.entries()).map(([feature, stats]) => ({
+        feature,
+        costUsd: stats.costUsd,
+        calls: stats.calls
+      })).sort((a, b) => b.costUsd - a.costUsd);
+
+      const timeSeriesResult = Array.from(timeSeriesMap.entries()).map(([key, stats]) => {
+        const [day, service] = key.split("_");
+        return {
+          day,
           service,
-          model,
-          COALESCE(SUM(cost_usd), 0) as cost_usd,
-          COALESCE(SUM(cost_brl), 0) as cost_brl,
-          COALESCE(SUM(total_tokens), 0) as total_tokens,
-          COUNT(*) as calls,
-          ROUND(AVG(latency_ms)) as avg_latency_ms
-        FROM ai_usage_logs
-        WHERE created_at >= NOW() - INTERVAL '${sql.raw(String(days))} days'
-        GROUP BY service, model
-        ORDER BY cost_usd DESC
-      `);
-
-      // Série temporal (por dia)
-      const timeSeriesResult = await db.execute(sql`
-        SELECT
-          DATE_TRUNC('day', created_at) AS day,
-          service,
-          COALESCE(SUM(cost_usd), 0) as cost_usd,
-          COALESCE(SUM(total_tokens), 0) as total_tokens
-        FROM ai_usage_logs
-        WHERE created_at >= NOW() - INTERVAL '${sql.raw(String(days))} days'
-        GROUP BY day, service
-        ORDER BY day ASC
-      `);
-
-      // Por feature
-      const byFeatureResult = await db.execute(sql`
-        SELECT
-          feature,
-          COALESCE(SUM(cost_usd), 0) as cost_usd,
-          COUNT(*) as calls
-        FROM ai_usage_logs
-        WHERE created_at >= NOW() - INTERVAL '${sql.raw(String(days))} days'
-        GROUP BY feature
-        ORDER BY cost_usd DESC
-      `);
-
-      const today = todayResult.rows[0] as any;
-      const month = monthResult.rows[0] as any;
+          costUsd: stats.costUsd,
+          totalTokens: stats.totalTokens
+        };
+      }).sort((a, b) => a.day.localeCompare(b.day));
 
       return reply.send({
         today: {
-          costUsd: Number(today.cost_usd),
-          costBrl: Number(today.cost_brl),
-          totalTokens: Number(today.total_tokens),
-          calls: Number(today.calls),
+          costUsd: Number(todayResult?.costUsd ?? 0),
+          costBrl: Number(todayResult?.costBrl ?? 0),
+          totalTokens: Number(todayResult?.totalTokens ?? 0),
+          calls: Number(todayResult?.calls ?? 0),
         },
         thisMonth: {
-          costUsd: Number(month.cost_usd),
-          costBrl: Number(month.cost_brl),
-          totalTokens: Number(month.total_tokens),
+          costUsd: Number(monthResult?.costUsd ?? 0),
+          costBrl: Number(monthResult?.costBrl ?? 0),
+          totalTokens: Number(monthResult?.totalTokens ?? 0),
         },
-        byService: byServiceResult.rows.map((r: any) => ({
+        byService: byServiceQuery.map((r) => ({
           service: r.service,
           model: r.model,
-          costUsd: Number(r.cost_usd),
-          costBrl: Number(r.cost_brl),
-          totalTokens: Number(r.total_tokens),
-          calls: Number(r.calls),
-          avgLatencyMs: Number(r.avg_latency_ms),
+          costUsd: Number(r.costUsd ?? 0),
+          costBrl: Number(r.costBrl ?? 0),
+          totalTokens: Number(r.totalTokens ?? 0),
+          calls: Number(r.calls ?? 0),
+          avgLatencyMs: Number(r.avgLatencyMs ?? 0),
         })),
-        byFeature: byFeatureResult.rows.map((r: any) => ({
-          feature: r.feature,
-          costUsd: Number(r.cost_usd),
-          calls: Number(r.calls),
-        })),
-        timeSeries: timeSeriesResult.rows.map((r: any) => ({
-          day: r.day,
-          service: r.service,
-          costUsd: Number(r.cost_usd),
-          totalTokens: Number(r.total_tokens),
-        })),
+        byFeature: byFeatureResult,
+        timeSeries: timeSeriesResult,
         modelPricing: MODEL_PRICING,
       });
     } catch (error) {
@@ -304,12 +333,17 @@ export async function aiUsageRoutes(app: FastifyInstance) {
 
       // Enriquece com uso atual do dia
       const enriched = await Promise.all(configs.map(async (cfg) => {
-        const todayResult = await db.execute(sql`
-          SELECT COALESCE(SUM(cost_usd), 0) as total
-          FROM ai_usage_logs
-          WHERE service = ${cfg.service} AND created_at >= CURRENT_DATE
-        `);
-        const todayUsd = Number(todayResult.rows[0]?.total ?? 0);
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+
+        const [todayResult] = await db
+          .select({ total: sum(aiUsageLogs.costUsd) })
+          .from(aiUsageLogs)
+          .where(and(
+             eq(aiUsageLogs.service, cfg.service),
+             gte(aiUsageLogs.createdAt, startOfToday)
+          ));
+        const todayUsd = Number(todayResult?.total ?? 0);
         const usedPercent = (todayUsd / cfg.dailyLimitUsd) * 100;
 
         return {

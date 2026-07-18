@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { db } from "../db/index.js";
 import { users, profiles, swipes, matches, swipeActionEnum } from "../db/schema.js";
-import { eq, and, ne, notInArray, or, inArray, sql } from "drizzle-orm";
+import { eq, and, ne, notInArray, or, inArray, gte, lte } from "drizzle-orm";
 
 export async function matchRoutes(app: FastifyInstance) {
   // Autenticação obrigatória
@@ -64,39 +64,37 @@ export async function matchRoutes(app: FastifyInstance) {
 
       // Age filter
       if (minAge) {
-        conditions.push(sql`extract(year from age(current_date, ${profiles.birthDate})) >= ${Number(minAge)}`);
+        const minDate = new Date();
+        minDate.setFullYear(minDate.getFullYear() - Number(minAge));
+        conditions.push(lte(profiles.birthDate, minDate.toISOString()));
       }
       if (maxAge) {
-        conditions.push(sql`extract(year from age(current_date, ${profiles.birthDate})) <= ${Number(maxAge)}`);
+        const maxDate = new Date();
+        maxDate.setFullYear(maxDate.getFullYear() - (Number(maxAge) + 1));
+        conditions.push(gte(profiles.birthDate, maxDate.toISOString()));
       }
 
-      // Location filter (Haversine)
+      // Location filter (Bounding Box - Drizzle native)
+      let lat = 0;
+      let lng = 0;
+      let rad = 0;
       if (radius && currentUser.latitude && currentUser.longitude) {
-        const rad = Number(radius);
-        const lat = currentUser.latitude;
-        const lng = currentUser.longitude;
+        rad = Number(radius);
+        lat = currentUser.latitude;
+        lng = currentUser.longitude;
         
-        // 6371 is Earth's radius in km
-        conditions.push(sql`
-          (6371 * acos(
-            cos(radians(${lat})) * cos(radians(${profiles.latitude})) *
-            cos(radians(${profiles.longitude}) - radians(${lng})) +
-            sin(radians(${lat})) * sin(radians(${profiles.latitude}))
-          )) <= ${rad}
-        `);
+        // 1 degree latitude = ~111 km
+        const latDelta = rad / 111;
+        const lngDelta = rad / (111 * Math.cos(lat * (Math.PI / 180)));
+        
+        conditions.push(gte(profiles.latitude, lat - latDelta));
+        conditions.push(lte(profiles.latitude, lat + latDelta));
+        conditions.push(gte(profiles.longitude, lng - lngDelta));
+        conditions.push(lte(profiles.longitude, lng + lngDelta));
       }
 
-      // Interests filter (JSONB intersects)
-      if (interests) {
-        const interestArray = interests.split(',').map(i => i.trim());
-        if (interestArray.length > 0) {
-           // We use the JSONB ?| operator to check if any of the array elements exist in the interests jsonb array
-           conditions.push(sql`${profiles.interests} ?| array[${sql.join(interestArray.map(i => sql`${i}`), sql`, `)}]`);
-        }
-      }
-
-      // 3. Busca os recomendados!
-      const feedProfiles = await db
+      // 3. Busca inicial pelo DB
+      let feedProfiles = await db
         .select({
           id: profiles.id,
           displayName: profiles.displayName,
@@ -107,16 +105,52 @@ export async function matchRoutes(app: FastifyInstance) {
           relationshipType: profiles.relationshipType,
           popularityScore: profiles.popularityScore,
           interests: profiles.interests,
+          latitude: profiles.latitude,
+          longitude: profiles.longitude,
         })
         .from(profiles)
         .leftJoin(users, eq(users.id, profiles.id))
-        .where(and(...conditions))
-        .limit(20);
-        
-      // Ordena por popularidade (descendente)
-      feedProfiles.sort((a, b) => b.popularityScore - a.popularityScore);
+        .where(and(...conditions));
 
-      return reply.send(feedProfiles);
+      // 4. Refinamento em Javascript (sem SQL puro)
+      
+      // Radius exato via Haversine
+      if (rad > 0) {
+        feedProfiles = feedProfiles.filter(p => {
+          if (!p.latitude || !p.longitude) return false;
+          const R = 6371; // Radius of the earth in km
+          const dLat = (p.latitude - lat) * (Math.PI/180);
+          const dLon = (p.longitude - lng) * (Math.PI/180); 
+          const a = 
+            Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat * (Math.PI/180)) * Math.cos(p.latitude * (Math.PI/180)) * 
+            Math.sin(dLon/2) * Math.sin(dLon/2); 
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+          const distance = R * c; // Distance in km
+          return distance <= rad;
+        });
+      }
+
+      // Interesses (Intersection em JSONB via JS)
+      if (interests) {
+        const interestArray = interests.split(',').map(i => i.trim().toLowerCase());
+        if (interestArray.length > 0) {
+           feedProfiles = feedProfiles.filter(p => {
+             const userInterests = Array.isArray(p.interests) ? p.interests.map(i => String(i).toLowerCase()) : [];
+             return interestArray.some(i => userInterests.includes(i));
+           });
+        }
+      }
+
+      // Ordena por popularidade (descendente) e corta em 20
+      feedProfiles.sort((a, b) => b.popularityScore - a.popularityScore);
+      const finalFeed = feedProfiles.slice(0, 20).map(p => {
+        // Remover lat/long da resposta final se não for necessário
+        const { latitude, longitude, ...rest } = p;
+        return rest;
+      });
+
+      return reply.send(finalFeed);
     } catch (err: any) {
       req.log.error(err);
       return reply.status(500).send({ message: "Erro ao gerar feed." });

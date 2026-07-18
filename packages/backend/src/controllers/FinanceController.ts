@@ -6,7 +6,7 @@ import {
   users,
   profiles,
 } from "../db/schema.js";
-import { eq, sql, and, gte, lte, desc, count, sum } from "drizzle-orm";
+import { eq, and, gte, lte, desc, count, sum } from "drizzle-orm";
 import Stripe from "stripe";
 import { requirePermission } from "../middleware/rbac.js";
 
@@ -43,12 +43,27 @@ export async function financeRoutes(app: FastifyInstance) {
         ))
         .groupBy(financialEvents.type);
 
-      const summaryResult = await db
+      let revenueCents = 0;
+      let refundsCents = 0;
+      let chargebacksCents = 0;
+      let feesCents = 0;
+
+      for (const row of totalsResult) {
+        const amount = Number(row.total_cents ?? 0);
+        if (row.type === "revenue") revenueCents += amount;
+        else if (row.type === "refund") refundsCents += Math.abs(amount);
+        else if (row.type === "chargeback") chargebacksCents += Math.abs(amount);
+        else if (row.type === "fee") feesCents += Math.abs(amount);
+      }
+
+      const netRevenueCents = revenueCents - refundsCents - chargebacksCents - feesCents;
+
+      // Time series - fetched raw and aggregated in JS to avoid sql`DATE_TRUNC`
+      const allEvents = await db
         .select({
-          revenue: sql<number>`COALESCE(SUM(CASE WHEN ${financialEvents.type} = 'revenue' THEN ${financialEvents.amountCents} ELSE 0 END), 0)`,
-          refunds: sql<number>`COALESCE(SUM(CASE WHEN ${financialEvents.type} = 'refund' THEN ABS(${financialEvents.amountCents}) ELSE 0 END), 0)`,
-          chargebacks: sql<number>`COALESCE(SUM(CASE WHEN ${financialEvents.type} = 'chargeback' THEN ABS(${financialEvents.amountCents}) ELSE 0 END), 0)`,
-          fees: sql<number>`COALESCE(SUM(CASE WHEN ${financialEvents.type} = 'fee' THEN ABS(${financialEvents.amountCents}) ELSE 0 END), 0)`,
+          type: financialEvents.type,
+          amountCents: financialEvents.amountCents,
+          recordedAt: financialEvents.recordedAt,
         })
         .from(financialEvents)
         .where(and(
@@ -56,27 +71,41 @@ export async function financeRoutes(app: FastifyInstance) {
           lte(financialEvents.recordedAt, new Date(to))
         ));
 
-      const s = summaryResult[0];
-      const revenueCents = Number(s.revenue ?? 0);
-      const refundsCents = Number(s.refunds ?? 0);
-      const chargebacksCents = Number(s.chargebacks ?? 0);
-      const feesCents = Number(s.fees ?? 0);
-      const netRevenueCents = revenueCents - refundsCents - chargebacksCents - feesCents;
-
       const truncUnit = groupBy === "month" ? "month" : groupBy === "week" ? "week" : "day";
-      const timeSeriesResult = await db
-        .select({
-          period: sql`DATE_TRUNC(${truncUnit}, ${financialEvents.recordedAt})`,
-          revenue: sql<number>`COALESCE(SUM(CASE WHEN ${financialEvents.type} = 'revenue' THEN ${financialEvents.amountCents} ELSE 0 END), 0)`,
-          deductions: sql<number>`COALESCE(SUM(CASE WHEN ${financialEvents.type} IN ('refund','chargeback','fee') THEN ABS(${financialEvents.amountCents}) ELSE 0 END), 0)`,
-        })
-        .from(financialEvents)
-        .where(and(
-          gte(financialEvents.recordedAt, new Date(from)),
-          lte(financialEvents.recordedAt, new Date(to))
-        ))
-        .groupBy(sql`DATE_TRUNC(${truncUnit}, ${financialEvents.recordedAt})`)
-        .orderBy(sql`DATE_TRUNC(${truncUnit}, ${financialEvents.recordedAt}) ASC`);
+      const timeSeriesMap = new Map<string, { revenue: number; deductions: number }>();
+
+      for (const ev of allEvents) {
+        const date = new Date(ev.recordedAt);
+        let periodKey = "";
+        
+        if (truncUnit === "day") {
+          periodKey = date.toISOString().split("T")[0];
+        } else if (truncUnit === "month") {
+          periodKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+        } else {
+          // week simplified
+          periodKey = `${date.getFullYear()}-W${Math.ceil(date.getDate() / 7)}`;
+        }
+
+        if (!timeSeriesMap.has(periodKey)) {
+          timeSeriesMap.set(periodKey, { revenue: 0, deductions: 0 });
+        }
+
+        const stats = timeSeriesMap.get(periodKey)!;
+        const amount = Number(ev.amountCents ?? 0);
+        
+        if (ev.type === "revenue") {
+          stats.revenue += amount;
+        } else if (["refund", "chargeback", "fee"].includes(ev.type)) {
+          stats.deductions += Math.abs(amount);
+        }
+      }
+
+      const timeSeriesResult = Array.from(timeSeriesMap.entries()).map(([period, stats]) => ({
+        period,
+        revenue: stats.revenue,
+        deductions: stats.deductions,
+      })).sort((a, b) => a.period.localeCompare(b.period));
 
       return reply.send({
         period: { from, to },

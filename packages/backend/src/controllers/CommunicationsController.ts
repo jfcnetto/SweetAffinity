@@ -6,7 +6,7 @@ import {
   users,
   userCrmNotes,
 } from "../db/schema.js";
-import { eq, sql, and } from "drizzle-orm";
+import { eq, and, desc, count } from "drizzle-orm";
 import { requirePermission } from "../middleware/rbac.js";
 
 export async function communicationsRoutes(app: FastifyInstance) {
@@ -25,27 +25,35 @@ export async function communicationsRoutes(app: FastifyInstance) {
     };
 
     try {
-      const result = await db.execute(sql`
-        SELECT
-          bc.id, bc.title, bc.type, bc.status,
-          bc.sent_count, bc.opened_count,
-          bc.scheduled_for, bc.sent_at, bc.created_at,
-          u.email AS created_by_email
-        FROM broadcast_campaigns bc
-        LEFT JOIN users u ON u.id = bc.created_by
-        ${status ? sql`WHERE bc.status = ${status}` : sql``}
-        ORDER BY bc.created_at DESC
-        LIMIT ${Number(limit)} OFFSET ${Number(offset)}
-      `);
+      const conditions = status ? eq(broadcastCampaigns.status, status as any) : undefined;
+      const campaignsResult = await db
+        .select({
+          id: broadcastCampaigns.id,
+          title: broadcastCampaigns.title,
+          type: broadcastCampaigns.type,
+          status: broadcastCampaigns.status,
+          sentCount: broadcastCampaigns.sentCount,
+          openedCount: broadcastCampaigns.openedCount,
+          scheduledFor: broadcastCampaigns.scheduledFor,
+          sentAt: broadcastCampaigns.sentAt,
+          createdAt: broadcastCampaigns.createdAt,
+          createdByEmail: users.email
+        })
+        .from(broadcastCampaigns)
+        .leftJoin(users, eq(users.id, broadcastCampaigns.createdBy))
+        .where(conditions)
+        .orderBy(desc(broadcastCampaigns.createdAt))
+        .limit(Number(limit))
+        .offset(Number(offset));
 
-      const totalResult = await db.execute(sql`
-        SELECT count(*) FROM broadcast_campaigns
-        ${status ? sql`WHERE status = ${status}` : sql``}
-      `);
+      const [totalResult] = await db
+        .select({ total: count() })
+        .from(broadcastCampaigns)
+        .where(conditions);
 
       return reply.send({
-        campaigns: result.rows,
-        total: Number(totalResult.rows[0].count),
+        campaigns: campaignsResult,
+        total: Number(totalResult?.total ?? 0),
       });
     } catch (error) {
       app.log.error(error);
@@ -135,22 +143,22 @@ export async function communicationsRoutes(app: FastifyInstance) {
 
       // Busca usuários-alvo com base no segmento
       const segment = campaign.targetSegment as any ?? {};
-      let whereConditions = sql`1=1`;
+      let whereConditions = [];
 
       if (segment.status) {
-        whereConditions = sql`${whereConditions} AND u.status = ${segment.status}`;
+        whereConditions.push(eq(users.status, segment.status));
       }
       if (segment.isPremium !== undefined) {
-        whereConditions = sql`${whereConditions} AND u.is_premium = ${segment.isPremium}`;
+        whereConditions.push(eq(users.isPremium, segment.isPremium));
       }
 
-      const targetUsers = await db.execute(sql`
-        SELECT u.id FROM users u
-        WHERE ${whereConditions}
-        LIMIT 10000
-      `);
+      const targetUsers = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
+        .limit(10000);
 
-      const userIds = targetUsers.rows.map((r: any) => r.id);
+      const userIds = targetUsers.map((r) => r.id);
       let sentCount = 0;
 
       // Dispara notificações in-app (se tipo for notification ou both)
@@ -256,18 +264,21 @@ export async function communicationsRoutes(app: FastifyInstance) {
   }, async (req: any, reply: FastifyReply) => {
     const { userId } = req.params as { userId: string };
     try {
-      const result = await db.execute(sql`
-        SELECT
-          n.id, n.content, n.created_at,
-          p.display_name AS author_name,
-          u.email AS author_email
-        FROM user_crm_notes n
-        JOIN users u ON u.id = n.author_id
-        LEFT JOIN profiles p ON p.id = n.author_id
-        WHERE n.user_id = ${userId}
-        ORDER BY n.created_at DESC
-      `);
-      return reply.send({ notes: result.rows });
+      const notesResult = await db
+        .select({
+          id: userCrmNotes.id,
+          content: userCrmNotes.content,
+          createdAt: userCrmNotes.createdAt,
+          authorName: profiles.displayName,
+          authorEmail: users.email
+        })
+        .from(userCrmNotes)
+        .innerJoin(users, eq(users.id, userCrmNotes.authorId))
+        .leftJoin(profiles, eq(profiles.id, userCrmNotes.authorId))
+        .where(eq(userCrmNotes.userId, userId))
+        .orderBy(desc(userCrmNotes.createdAt));
+        
+      return reply.send({ notes: notesResult });
     } catch (error) {
       app.log.error(error);
       return reply.status(500).send({ message: "Erro ao buscar notas." });
