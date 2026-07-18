@@ -14,9 +14,9 @@ export async function matchRoutes(app: FastifyInstance) {
   });
 
   // =====================================================
-  // GET /api/feed - Buscar perfis recomendados
+  // GET /feed - Buscar perfis recomendados
   // =====================================================
-  app.get("/api/feed", async (req: any, reply: FastifyReply) => {
+  app.get("/feed", async (req: any, reply: FastifyReply) => {
     try {
       const userId = req.user.sub;
       
@@ -158,9 +158,9 @@ export async function matchRoutes(app: FastifyInstance) {
   });
 
   // =====================================================
-  // POST /api/swipe - Registrar Like ou Pass
+  // POST /swipe - Realiza a ação de curtir/passar (RN-021)
   // =====================================================
-  app.post("/api/swipe", async (req: any, reply: FastifyReply) => {
+  app.post("/swipe", async (req: any, reply: FastifyReply) => {
     try {
       const fromUserId = req.user.sub;
       const { toUserId, action } = req.body as { toUserId: string; action: "like" | "pass" };
@@ -230,9 +230,9 @@ export async function matchRoutes(app: FastifyInstance) {
   });
 
   // =====================================================
-  // GET /api/matches - Retorna os matches do usuário
+  // GET /matches - Retorna os matches do usuário
   // =====================================================
-  app.get("/api/matches", async (req: any, reply: FastifyReply) => {
+  app.get("/matches", async (req: any, reply: FastifyReply) => {
     try {
       const userId = req.user.sub;
 
