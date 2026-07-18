@@ -5,6 +5,7 @@ import {
   notifications,
   users,
   userCrmNotes,
+  profiles,
 } from "../db/schema.js";
 import { eq, and, desc, count } from "drizzle-orm";
 import { requirePermission } from "../middleware/rbac.js";
