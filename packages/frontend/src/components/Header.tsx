@@ -327,6 +327,7 @@ const Header: React.FC<HeaderProps> = ({
                 Criar Conta
               </button>
             </div>
+            </>
           )}
 
           {isAuthenticated && (
