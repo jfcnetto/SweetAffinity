@@ -89,3 +89,9 @@ export interface UserSubscription {
   expires_at?: string;
   cancel_at_period_end: boolean;
 }
+
+// ─── INTERFACE DE COMPONENTES ─────────────────────────────────────
+export interface FaqItem {
+  question: string;
+  answer: string;
+}
