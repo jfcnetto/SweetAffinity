@@ -194,7 +194,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, initialMode, onRegistrat
                     login(data.accessToken, data.refreshToken);
                 }
                 toast.success('Cadastro realizado com sucesso!');
-                onRegistrationComplete(profileType);
+                onRegistrationComplete(profileType as any);
             }
         } catch (error: any) {
             const msg = error.response?.data?.message || 'Erro de conexão com o servidor.';
