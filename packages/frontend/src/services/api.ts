@@ -69,7 +69,7 @@ api.interceptors.response.use(
       }
 
       try {
-        const { data } = await axios.post('http://localhost:4000/auth/refresh', {
+        const { data } = await axios.post(`${api.defaults.baseURL}/auth/refresh`, {
           refreshToken
         });
 

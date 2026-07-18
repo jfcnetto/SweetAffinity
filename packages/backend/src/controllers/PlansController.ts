@@ -67,10 +67,11 @@ export const plansRoutes = async (fastify: FastifyInstance) => {
                         stripeKey === "sk_test_dummy_123" || 
                         !stripeKey.startsWith("sk_");
 
+        const frontendUrl = process.env.FRONTEND_URL || process.env.APP_URL || "https://sweet-affinity-frontend.vercel.app";
         if (isDummy) {
           return reply.send({
             id: `cs_dev_${Date.now()}`,
-            url: `http://localhost:3000/premium/success?session_id=cs_dev_${Date.now()}`,
+            url: `${frontendUrl}/premium/success?session_id=cs_dev_${Date.now()}`,
             simulated: true,
           });
         }
@@ -85,8 +86,8 @@ export const plansRoutes = async (fastify: FastifyInstance) => {
                 quantity: 1,
               },
             ],
-            success_url: `http://localhost:3000/premium/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `http://localhost:3000/premium/cancel`,
+            success_url: `${frontendUrl}/premium/success?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${frontendUrl}/premium/cancel`,
             metadata: {
               userId: user.sub,
               stripePriceId,
@@ -101,7 +102,7 @@ export const plansRoutes = async (fastify: FastifyInstance) => {
           fastify.log.warn("Stripe real falhou (Redirecionando para Simulação/Mock):", stripeErr.message);
           return reply.send({
             id: `cs_dev_${Date.now()}`,
-            url: `http://localhost:3000/premium/success?session_id=cs_dev_${Date.now()}`,
+            url: `${frontendUrl}/premium/success?session_id=cs_dev_${Date.now()}`,
             simulated: true,
           });
         }

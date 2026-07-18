@@ -71,7 +71,7 @@ const MessageModal: React.FC<MessageModalProps> = ({ recipient, onClose, isPremi
     const emojiPickerRef = useRef<HTMLDivElement>(null);
     const modalRef = useRef<HTMLDivElement>(null);
 
-    const API_URL = 'http://localhost:4000';
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://sweetaffinity-backend.onrender.com';
 
     // 1. CARREGAR HISTÓRICO PERSISTENTE DO BANCO DE DADOS LOCAL
     useEffect(() => {

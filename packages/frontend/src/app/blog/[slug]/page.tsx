@@ -7,7 +7,8 @@ interface BlogPostProps {
 
 async function getPostData(slug: string) {
   try {
-    const response = await fetch(`http://localhost:4000/blog/${slug}`, { 
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://sweetaffinity-backend.onrender.com';
+    const response = await fetch(`${API_URL}/blog/${slug}`, { 
       cache: 'no-store' 
     });
     if (!response.ok) return null;

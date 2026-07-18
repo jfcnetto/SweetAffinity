@@ -2,7 +2,8 @@ import nodemailer from "nodemailer";
 
 export class EmailService {
   static async sendVerificationEmail(email: string, token: string) {
-    const verificationLink = `http://localhost:3000/auth/verify?token=${token}`;
+    const frontendUrl = process.env.FRONTEND_URL || process.env.APP_URL || "https://sweet-affinity-frontend.vercel.app";
+    const verificationLink = `${frontendUrl}/auth/verify?token=${token}`;
     
     // Mostra o link destacado no console para facilitar o teste local
     console.log("\n==================================================");
@@ -77,7 +78,7 @@ export class EmailService {
               <p>Temos ótimas notícias! O seu perfil foi analisado e aprovado pela nossa equipe de moderação.</p>
               <p>Agora você já pode acessar a plataforma, buscar conexões, enviar mensagens e aproveitar tudo o que o Sweet Affinity tem a oferecer.</p>
               <p style="margin: 30px 0;">
-                <a href="http://localhost:3000" style="background-color: #FF5864; color: white; padding: 12px 24px; text-decoration: none; border-radius: 24px; font-weight: bold; display: inline-block;">Acessar a Plataforma</a>
+                <a href="${process.env.FRONTEND_URL || process.env.APP_URL || "https://sweet-affinity-frontend.vercel.app"}" style="background-color: #FF5864; color: white; padding: 12px 24px; text-decoration: none; border-radius: 24px; font-weight: bold; display: inline-block;">Acessar a Plataforma</a>
               </p>
               <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
               <p style="font-size: 12px; color: #777;">Este e-mail foi enviado automaticamente. Se precisar de ajuda, entre em contato com nosso suporte.</p>
