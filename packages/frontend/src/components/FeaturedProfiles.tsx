@@ -71,8 +71,8 @@ const FeaturedProfiles: React.FC<FeaturedProfilesProps> = ({ sectionTitle, profi
   return (
     <section className="py-20 bg-white">
       <div className="container mx-auto px-6">
-        <h2 className="text-4xl font-bold text-center mb-4 font-display text-gray-800">{sectionTitle}</h2>
-        <div className="flex justify-center space-x-2 md:space-x-4 mb-12 flex-wrap">
+        <h2 className="text-3xl md:text-4xl font-bold text-center mb-4 md:mb-6 font-display text-gray-800">{sectionTitle}</h2>
+        <div className="flex justify-center gap-2 md:gap-4 mb-8 md:mb-12 flex-wrap">
           <TabButton tabName="destaques" label="Destaques" />
           <TabButton tabName="novos" label="Novos" />
           <TabButton tabName="proximos" label="Próximos a você" />
@@ -80,7 +80,7 @@ const FeaturedProfiles: React.FC<FeaturedProfilesProps> = ({ sectionTitle, profi
         </div>
         
         {displayedProfiles.length > 0 ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
             {displayedProfiles.map(profile => (
               <div key={profile.id} className="relative">
                 <div onClick={() => onProfileClick(profile)} className="w-full text-left rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gradient-pink transition-all duration-300 cursor-pointer">

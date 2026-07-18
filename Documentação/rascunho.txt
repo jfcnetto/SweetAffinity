@@ -1,16 +1,25 @@
 NOME DO SITE: SweetAffinity.com
+https://sweet-affinity-frontend.vercel.app/
+
 https://abacus.ai/app/profile/apikey
 https://apps.abacus.ai/chatllm/route_llm?category=featured
 
 
 
 
+======== Ferramentas ========
 
 https://dashboard.stripe.com/acct_1SNh0FRoTYuGqKaq/test/dashboard
 https://dualite.dev/
 https://www.youtube.com/watch?v=gvNtAkkucPc&t=1139s
-
 https://console.neon.tech/app/projects/hidden-band-97710819/branches/br-little-sun-ackzf9p0/sql-editor?database=neondb#grid
+upstash.com
+cloudflare.com
+
+render.com BACKEND
+https://vercel.com/ FRONTEND
+
+https://console.cloud.google.com/apis/credentials?project=sweet-affinity-oauth (Login Google)
 
 cd packages/backend
 npm run dev
@@ -18,34 +27,6 @@ npm run dev
 
 cd packages/frontend
 npm run dev
-
-Neon.tech
-
- (Neon, Upstash, Cloudflare R2)
-
-
-🔑 Guia Passo a Passo: Obtendo as Chaves (Cloud)
-Para substituir o Docker, você precisará criar contas nestes 3 serviços e colar as chaves no arquivo .env.
-
-A. Neon.tech (PostgreSQL)
-DATABASE_URL="postgresql://neondb_owner:npg_9IyBOpftWAU5@ep-floral-feather-ac7hgpbz-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
-
-
-B. Upstash (Redis)
-Acesse upstash.com e crie uma conta.
-No painel, vá em Redis e clique em "Create Database".
-Dê um nome, escolha a região mais próxima (ex: us-east-1) e marque a opção "Free".
-Após criar, role a página até a seção "REST API" ou "Connect" (depende da sua biblioteca). Se você usa ioredis padrão, vá em "Connect -> Node.js".
-Copie a URL gerada (começa com rediss://...) e cole no .env: REDIS_URL="sua_string_aqui"
-C. Cloudflare R2 (S3 / Arquivos)
-Crie uma conta na Cloudflare e adicione um método de pagamento (é obrigatório para evitar spam, mas o R2 tem 10GB grátis e não cobra até você passar disso).
-No menu lateral, clique em R2 e depois em "Create bucket" (ex: sweetaffinity-assets).
-Volte na visão geral do R2, do lado direito, clique em "Manage R2 API Tokens".
-Clique em "Create API Token", dê permissão de Object Read & Write e gere o token.
-Ele vai te mostrar 3 informações cruciais. Cole-as no seu .env:
-AWS_ACCESS_KEY_ID="seu_access_key"
-AWS_SECRET_ACCESS_KEY="seu_secret_key"
-AWS_ENDPOINT_URL_S3="sua_jurisdiction_url" (No painel do Bucket nas configurações, haverá uma S3 API URL).
 
 
 

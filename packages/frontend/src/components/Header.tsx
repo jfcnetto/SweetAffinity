@@ -5,7 +5,7 @@ import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { Avatar } from '../design-system/components/Avatar';
 import { toast } from '../design-system/components/Toast';
-import { Home, Heart, MessageSquare, ShieldAlert, BookOpen } from 'lucide-react';
+import { Home, Heart, MessageSquare, ShieldAlert, BookOpen, Menu, X } from 'lucide-react';
 
 interface HeaderProps {
   onLoginClick: () => void;
@@ -26,6 +26,7 @@ const Header: React.FC<HeaderProps> = ({
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user, discretionMode, toggleDiscretionMode } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -83,9 +84,9 @@ const Header: React.FC<HeaderProps> = ({
       <div className="container mx-auto px-6 py-4 flex justify-between items-center">
         <Link href={isAdminView ? "/admin" : "/"} className="flex items-center space-x-2.5 group cursor-pointer">
           {/* Logo Icon: Infinity Heart Container */}
-          <div className="relative w-9 h-9 flex items-center justify-center bg-gradient-to-tr from-gradient-pink to-gradient-orange rounded-xl shadow-sm group-hover:scale-105 transition-transform duration-300">
+          <div className="relative w-9 h-9 flex items-center justify-center bg-gradient-to-tr from-gradient-pink to-gradient-orange rounded-xl shadow-sm group-hover:scale-105 transition-transform duration-300 flex-shrink-0">
             <svg 
-              className="w-5.5 h-5.5 text-white" 
+              className="w-5 h-5 text-white" 
               viewBox="0 0 24 24" 
               fill="currentColor" 
               xmlns="http://www.w3.org/2000/svg"
@@ -95,7 +96,7 @@ const Header: React.FC<HeaderProps> = ({
             </svg>
           </div>
           {/* Logo Text */}
-          <span className="text-2xl font-bold tracking-tight">
+          <span className="text-xl md:text-2xl font-bold tracking-tight hidden sm:block whitespace-nowrap">
             <span className="text-slate-900 font-extrabold">Sweet</span>
             <span className="bg-gradient-to-r from-gradient-pink to-gradient-orange bg-clip-text text-transparent ml-1 font-black">Affinity</span>
           </span>
@@ -222,7 +223,7 @@ const Header: React.FC<HeaderProps> = ({
               {!user?.isPremium && (
                 <button
                   onClick={() => router.push('/plans')}
-                  className="bg-red-600 hover:bg-red-700 text-white font-bold px-3.5 py-1.5 rounded-full text-xs transition-colors shadow-sm whitespace-nowrap ml-2"
+                  className="hidden md:inline-block bg-red-600 hover:bg-red-700 text-white font-bold px-3.5 py-1.5 rounded-full text-xs transition-colors shadow-sm whitespace-nowrap ml-2"
                 >
                   Seja Premium
                 </button>
@@ -312,26 +313,90 @@ const Header: React.FC<HeaderProps> = ({
             </>
           ) : (
             <>
-              <a 
-                href="/blog" 
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-gray-655 hover:text-pink-650 transition-colors duration-300 flex items-center text-sm font-semibold mr-4"
+            <div className="flex items-center space-x-3">
+              <button 
+                onClick={onLoginClick}
+                className="text-gray-600 hover:text-gray-900 font-semibold px-4 py-2 rounded-full transition-colors hidden sm:block"
               >
-                <BookOpen className="w-4 h-4 mr-1.5" />
-                Blog
-              </a>
-              <button onClick={onLoginClick} className="text-gray-600 hover:text-intense-red transition-colors duration-300">Entrar</button>
-              <button
-                onClick={onRegisterClick}
-                className="bg-gradient-to-r from-gradient-pink to-gradient-orange text-white font-semibold px-6 py-2 rounded-full hover:opacity-90 transition-all duration-300 transform hover:scale-105"
-              >
-                Cadastre-se
+                Entrar
               </button>
-            </>
+              <button 
+                onClick={onRegisterClick}
+                className="bg-gray-900 hover:bg-black text-white font-semibold px-6 py-2.5 rounded-full shadow-lg shadow-gray-200 transition-all hover:-translate-y-0.5 whitespace-nowrap"
+              >
+                Criar Conta
+              </button>
+            </div>
+          )}
+
+          {isAuthenticated && (
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="md:hidden p-2 text-gray-600 hover:text-pink-600"
+            >
+              {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
           )}
         </div>
       </div>
+
+      {/* Mobile Menu Dropdown */}
+      {isMobileMenuOpen && isAuthenticated && (
+        <nav className="md:hidden bg-white border-t border-gray-100 flex flex-col shadow-lg pb-4 absolute w-full">
+          <Link
+            href="/"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`flex items-center px-6 py-4 text-base font-semibold border-b border-gray-50 ${
+              pathname === '/' ? 'text-pink-650 bg-pink-50/50' : 'text-gray-600'
+            }`}
+          >
+            <Home className="w-5 h-5 mr-3" />
+            Home
+          </Link>
+          <Link
+            href="/matches"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`flex items-center px-6 py-4 text-base font-semibold border-b border-gray-50 ${
+              pathname === '/matches' ? 'text-pink-650 bg-pink-50/50' : 'text-gray-600'
+            }`}
+          >
+            <Heart className="w-5 h-5 mr-3" />
+            Matches
+          </Link>
+          <Link
+            href="/chat"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`flex items-center px-6 py-4 text-base font-semibold border-b border-gray-50 ${
+              pathname === '/chat' ? 'text-pink-650 bg-pink-50/50' : 'text-gray-600'
+            }`}
+          >
+            <MessageSquare className="w-5 h-5 mr-3" />
+            Mensagens
+          </Link>
+          <a
+            href="/blog"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`flex items-center px-6 py-4 text-base font-semibold border-b border-gray-50 ${
+              pathname.startsWith('/blog') ? 'text-pink-650 bg-pink-50/50' : 'text-gray-600'
+            }`}
+          >
+            <BookOpen className="w-5 h-5 mr-3" />
+            Blog
+          </a>
+          {!user?.isPremium && (
+            <div className="px-6 pt-4">
+              <button
+                onClick={() => { setIsMobileMenuOpen(false); router.push('/plans'); }}
+                className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-colors shadow-sm"
+              >
+                Seja Premium
+              </button>
+            </div>
+          )}
+        </nav>
+      )}
     </header>
   );
 };
