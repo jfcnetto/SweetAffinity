@@ -45,6 +45,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
           onClose={() => setIsAuthModalOpen(false)} 
           initialMode={authMode} 
           onRegistrationComplete={() => { setIsAuthModalOpen(false); router.push('/register/photos'); }}
+          onLoginSuccess={() => setIsAuthModalOpen(false)}
           navigateTo={(page) => router.push(page)}
         />
       )}
