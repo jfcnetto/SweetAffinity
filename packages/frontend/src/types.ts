@@ -11,11 +11,23 @@ export interface User {
   email: string;
   phone?: string;
   profile_type: ProfileType;
-  status: account_status;
+  status: AccountStatus;
   is_verified: boolean;
   is_premium: boolean;
   created_at: string;
   last_login?: string;
+  
+  // Camel Case aliases used across frontend components
+  isPremium?: boolean;
+  hasPhotos?: boolean;
+  primaryPhotoUrl?: string;
+  relationshipType?: string;
+  role?: string;
+  display_name?: string;
+  displayName?: string;
+  city?: string;
+  state?: string;
+  createdAt?: string;
 }
 
 // ─── INTERFACE DO PERFIL (UX & CARDS VISUAIS) ─────────────────────
