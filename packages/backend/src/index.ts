@@ -115,7 +115,7 @@ async function start() {
     });
 
     await server.register(cors, {
-      origin: process.env.APP_URL || "http://localhost:3000",
+      origin: [process.env.FRONTEND_URL || "https://sweet-affinity-frontend.vercel.app", process.env.APP_URL || "http://localhost:3000"],
       credentials: true,
     });
 
@@ -285,7 +285,7 @@ async function start() {
 
     const io = new Server(server.server, {
       cors: {
-        origin: process.env.APP_URL || "http://localhost:3000",
+        origin: [process.env.FRONTEND_URL || "https://sweet-affinity-frontend.vercel.app", process.env.APP_URL || "http://localhost:3000"],
       },
     });
 
