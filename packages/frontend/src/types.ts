@@ -99,6 +99,8 @@ export interface Plan {
   name: string;
   price: number;
   limit_messages_day: number;
+  highlight?: boolean;
+  features?: string[];
 }
 
 export interface UserSubscription {

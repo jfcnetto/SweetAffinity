@@ -15,7 +15,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ profile, onClose, navigateT
   const isPremiumUser = false;
   const FREE_PHOTO_LIMIT = 5;
 
-  const totalPhotos = profile.imageUrls.length;
+  const totalPhotos = profile.imageUrls?.length || 0;
   const isLocked = !isPremiumUser && currentIndex >= FREE_PHOTO_LIMIT;
 
   const goToPrevious = () => {
@@ -46,7 +46,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ profile, onClose, navigateT
             <div className="relative group">
               <div className="w-full h-full min-h-[400px] md:min-h-[500px] bg-gray-200">
                 <img 
-                    src={profile.imageUrls[currentIndex]} 
+                    src={profile.imageUrls?.[currentIndex] || profile.primaryPhotoUrl || ''} 
                     alt={`${profile.name} - Foto ${currentIndex + 1}`} 
                     className={`w-full h-full object-cover transition-all duration-300 ${isLocked ? 'blur-md' : ''}`} 
                 />

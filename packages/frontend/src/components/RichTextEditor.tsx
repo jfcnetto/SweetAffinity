@@ -124,7 +124,7 @@ export default function RichTextEditor({ value, onChange, placeholder }: RichTex
         onInput={handleInput}
         onBlur={handleInput}
         className="p-4 min-h-[300px] max-h-[500px] overflow-y-auto outline-none prose dark:prose-invert max-w-none text-gray-900 dark:text-gray-100"
-        placeholder={placeholder}
+        data-placeholder={placeholder}
       />
     </div>
   );

@@ -52,10 +52,10 @@ const SearchResults: React.FC<SearchResultsProps> = ({ profiles, onProfileClick,
                         <button onClick={() => onProfileClick(profile)} className="w-full text-left rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gradient-pink transition-all duration-300">
                             <ProfileCard 
                                 profile={profile} 
-                                isFavorited={favoritedProfiles.includes(profile.id)}
+                                isFavorited={favoritedProfiles.includes(profile.id as any)}
                                 onToggleFavorite={(e) => {
                                     e.stopPropagation();
-                                    handleToggleFavorite(profile.id);
+                                    handleToggleFavorite(profile.id as any);
                                 }}
                             />
                         </button>

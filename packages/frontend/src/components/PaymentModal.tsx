@@ -19,7 +19,7 @@ const CheckCircleIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className=
 const PaymentModal: React.FC<PaymentModalProps> = ({ plan, onClose, onPaymentSuccess }) => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
-    const { fetchUser } = useAuth();
+    const { refreshUser } = useAuth();
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -28,7 +28,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ plan, onClose, onPaymentSuc
            const intent = await PaymentService.createIntent(plan.name.toLowerCase() === 'vip' ? 'premium' : 'premium_plus');
            await PaymentService.confirmPayment(intent.paymentIntentId);
            
-           await fetchUser();
+           await refreshUser();
            setIsSuccess(true);
         } catch (error: any) {
            toast.error(error.response?.data?.message || 'Erro ao processar pagamento.');
