@@ -253,12 +253,18 @@ export async function authRoutes(app: any) {
       const refreshToken = await AuthService.generateRefreshToken(user.id);
       
       // Redireciona de volta para o frontend (passando tokens na URL para o AuthContext capturar)
-      const frontendUrl = process.env.FRONTEND_URL || process.env.APP_URL || "https://sweet-affinity-frontend.vercel.app";
+      let frontendUrl = process.env.FRONTEND_URL || process.env.APP_URL || "https://sweet-affinity-frontend.vercel.app";
+      if (process.env.NODE_ENV === "production" && frontendUrl.includes("localhost")) {
+        frontendUrl = "https://sweet-affinity-frontend.vercel.app";
+      }
       return reply.redirect(`${frontendUrl}/?access_token=${accessToken}&refresh_token=${refreshToken}`);
 
     } catch (err: any) {
       req.log.error(err);
-      const frontendUrl = process.env.FRONTEND_URL || process.env.APP_URL || "https://sweet-affinity-frontend.vercel.app";
+      let frontendUrl = process.env.FRONTEND_URL || process.env.APP_URL || "https://sweet-affinity-frontend.vercel.app";
+      if (process.env.NODE_ENV === "production" && frontendUrl.includes("localhost")) {
+        frontendUrl = "https://sweet-affinity-frontend.vercel.app";
+      }
       return reply.redirect(`${frontendUrl}/?auth_error=google_failed`);
     }
   });
