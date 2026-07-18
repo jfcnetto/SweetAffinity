@@ -31,7 +31,7 @@ export default function CompleteProfilePage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-6 flex items-center justify-center">
       <div className="w-full max-w-4xl">
-        <OnboardingWizard onComplete={handleComplete} userId={user.id} />
+        <OnboardingWizard onComplete={handleComplete} userId={user.id as string} />
       </div>
     </div>
   );
