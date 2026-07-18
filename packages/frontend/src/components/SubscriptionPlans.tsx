@@ -27,8 +27,8 @@ const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({ plans, onSubscrib
               <h3 className="text-3xl font-bold font-display text-center mb-4">{plan.name}</h3>
               <p className="text-4xl font-bold text-center mb-6">{plan.price}</p>
               <ul className="space-y-4 mb-8 flex-grow">
-                {plan.features.map((feature, index) => (
-                  <li key={index} className="flex items-start">
+                {plan.features?.map((feature, index) => (
+                  <li key={index} className="flex items-center text-gray-700">
                     <CheckIcon />
                     <span>{feature}</span>
                   </li>
