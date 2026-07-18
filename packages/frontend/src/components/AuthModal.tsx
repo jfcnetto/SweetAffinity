@@ -239,7 +239,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, initialMode, onRegistrat
             profileType = profileTypeEl.value || 'baby';
         }
         localStorage.setItem('pendingProfileType', profileType);
-        window.location.href = `http://localhost:4000/auth/google`;
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+        window.location.href = `${apiUrl}/auth/google`;
     };
     
     const renderLogin = () => (
