@@ -313,7 +313,7 @@ const Header: React.FC<HeaderProps> = ({
             </>
           ) : (
             <>
-            <div className="flex items-center space-x-2 sm:space-x-3">
+            <div className="hidden md:flex items-center space-x-2 sm:space-x-3">
               <a 
                 href="/blog" 
                 target="_blank"
