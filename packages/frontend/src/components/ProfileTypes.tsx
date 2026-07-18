@@ -1,7 +1,7 @@
 
 import React from 'react';
 
-const ProfileCard: React.FC<{ title: string; description: string; icon: JSX.Element }> = ({ title, description, icon }) => (
+const ProfileCard: React.FC<{ title: string; description: string; icon: React.ReactNode }> = ({ title, description, icon }) => (
   <div className="bg-white p-8 rounded-lg shadow-lg text-center transform hover:-translate-y-2 transition-transform duration-300">
     <div className="mx-auto bg-gradient-pink/10 rounded-full h-20 w-20 flex items-center justify-center mb-6">
       {icon}

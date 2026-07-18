@@ -1,7 +1,7 @@
 
 import React from 'react';
 
-const Step: React.FC<{ number: string; title: string; description: string; icon: JSX.Element }> = ({ number, title, description, icon }) => (
+const Step: React.FC<{ number: string; title: string; description: string; icon: React.ReactNode }> = ({ number, title, description, icon }) => (
   <div className="text-center">
     <div className="relative mb-6">
       <div className="mx-auto bg-white rounded-full h-24 w-24 flex items-center justify-center shadow-lg border-2 border-gradient-pink">
