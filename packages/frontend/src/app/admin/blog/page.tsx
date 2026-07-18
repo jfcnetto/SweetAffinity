@@ -167,7 +167,7 @@ export default function AdminBlogPage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Gerenciamento do Blog</h1>
           <p className="text-gray-500 text-sm mt-1">Crie, edite e gerencie todos os artigos do SweetAffinity.</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-3 w-full sm:w-auto">
           <button
             onClick={openModalForCreate}
             className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium text-sm shadow-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-700"
@@ -261,9 +261,9 @@ export default function AdminBlogPage() {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col">
-            <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
+        <div className="fixed inset-0 z-50 flex items-center justify-center sm:p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-4xl sm:rounded-2xl overflow-y-auto shadow-2xl flex flex-col">
+            <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-100 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                 {editingPost ? "Editar Artigo" : "Criar Novo Artigo Manual"}
               </h2>

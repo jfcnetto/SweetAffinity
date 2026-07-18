@@ -117,38 +117,11 @@ export default function AdminCRMDashboard() {
     n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-gray-100 flex flex-col py-6 px-4 gap-1 fixed h-full z-10">
-        <div className="mb-6 px-2">
-          <h1 className="text-xl font-bold bg-gradient-to-r from-pink-600 to-rose-500 bg-clip-text text-transparent">
-            Sweet Affinity
-          </h1>
-          <p className="text-xs text-gray-400 mt-0.5">CRM Administrativo</p>
-        </div>
-
-        {NAV_ITEMS.map((item) => (
-          <button
-            key={item.href}
-            onClick={() => router.push(item.href)}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition ${
-              item.active
-                ? 'bg-gradient-to-r from-pink-500 to-rose-600 text-white shadow'
-                : 'text-gray-600 hover:bg-gray-50'
-            }`}
-          >
-            <item.icon className="w-4 h-4" />
-            {item.label}
-          </button>
-        ))}
-      </aside>
-
-      {/* Main */}
-      <main className="flex-1 ml-64 p-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
+    <div className="p-4 sm:p-8">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h2>
             <p className="text-gray-400 text-sm mt-0.5">
               Atualizado às {lastRefresh.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </p>
@@ -163,9 +136,9 @@ export default function AdminCRMDashboard() {
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {[...Array(8)].map((_, i) => (
-              <div key={i} className="h-32 bg-white rounded-2xl animate-pulse border border-gray-100" />
+              <div key={i} className="h-32 bg-white dark:bg-gray-800 rounded-2xl animate-pulse border border-gray-100 dark:border-gray-700" />
             ))}
           </div>
         ) : (
@@ -173,7 +146,7 @@ export default function AdminCRMDashboard() {
             {/* KPIs Principais */}
             <section className="mb-8">
               <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Receita & Crescimento</h3>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                 <KpiCard
                   icon={DollarSign}
                   label="MRR"
@@ -207,7 +180,7 @@ export default function AdminCRMDashboard() {
 
             <section className="mb-8">
               <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Operação & Moderação</h3>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                 <KpiCard
                   icon={AlertTriangle}
                   label="Denúncias Pendentes"
@@ -243,7 +216,7 @@ export default function AdminCRMDashboard() {
             {/* Quick Actions */}
             <section className="mb-8">
               <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Ações Rápidas</h3>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
                   { label: 'Ver Denúncias', href: '/admin/reports', icon: AlertTriangle, color: 'bg-red-50 text-red-600 border-red-100' },
                   { label: 'Fluxo de Caixa', href: '/admin/finance', icon: DollarSign, color: 'bg-green-50 text-green-700 border-green-100' },
@@ -293,7 +266,6 @@ export default function AdminCRMDashboard() {
             )}
           </>
         )}
-      </main>
     </div>
   );
 }

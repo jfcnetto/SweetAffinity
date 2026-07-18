@@ -313,67 +313,94 @@ const Header: React.FC<HeaderProps> = ({
             </>
           ) : (
             <>
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 sm:space-x-3">
+              <a 
+                href="/blog" 
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden md:flex text-gray-655 hover:text-pink-650 transition-colors duration-300 items-center text-sm font-semibold mr-2"
+              >
+                <BookOpen className="w-4 h-4 mr-1.5" />
+                Blog
+              </a>
               <button 
                 onClick={onLoginClick}
-                className="text-gray-600 hover:text-gray-900 font-semibold px-4 py-2 rounded-full transition-colors hidden sm:block"
+                className="text-gray-600 hover:text-intense-red transition-colors duration-300 font-semibold px-2 sm:px-4 py-2 rounded-full"
               >
                 Entrar
               </button>
               <button 
                 onClick={onRegisterClick}
-                className="bg-gray-900 hover:bg-black text-white font-semibold px-6 py-2.5 rounded-full shadow-lg shadow-gray-200 transition-all hover:-translate-y-0.5 whitespace-nowrap"
+                className="bg-gradient-to-r from-gradient-pink to-gradient-orange text-white font-semibold px-4 sm:px-6 py-2 sm:py-2.5 rounded-full hover:opacity-90 transition-all duration-300 transform hover:scale-105 whitespace-nowrap text-sm sm:text-base"
               >
-                Criar Conta
+                Cadastre-se
               </button>
             </div>
             </>
           )}
 
-          {isAuthenticated && (
-            <button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden p-2 text-gray-600 hover:text-pink-600"
-            >
-              {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
-          )}
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="md:hidden p-2 text-gray-600 hover:text-pink-600 ml-2"
+          >
+            {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
         </div>
       </div>
 
       {/* Mobile Menu Dropdown */}
-      {isMobileMenuOpen && isAuthenticated && (
+      {isMobileMenuOpen && (
         <nav className="md:hidden bg-white border-t border-gray-100 flex flex-col shadow-lg pb-4 absolute w-full">
-          <Link
-            href="/"
-            onClick={() => setIsMobileMenuOpen(false)}
-            className={`flex items-center px-6 py-4 text-base font-semibold border-b border-gray-50 ${
-              pathname === '/' ? 'text-pink-650 bg-pink-50/50' : 'text-gray-600'
-            }`}
-          >
-            <Home className="w-5 h-5 mr-3" />
-            Home
-          </Link>
-          <Link
-            href="/matches"
-            onClick={() => setIsMobileMenuOpen(false)}
-            className={`flex items-center px-6 py-4 text-base font-semibold border-b border-gray-50 ${
-              pathname === '/matches' ? 'text-pink-650 bg-pink-50/50' : 'text-gray-600'
-            }`}
-          >
-            <Heart className="w-5 h-5 mr-3" />
-            Matches
-          </Link>
-          <Link
-            href="/chat"
-            onClick={() => setIsMobileMenuOpen(false)}
-            className={`flex items-center px-6 py-4 text-base font-semibold border-b border-gray-50 ${
-              pathname === '/chat' ? 'text-pink-650 bg-pink-50/50' : 'text-gray-600'
-            }`}
-          >
-            <MessageSquare className="w-5 h-5 mr-3" />
-            Mensagens
-          </Link>
+          {isAuthenticated ? (
+            <>
+              <Link
+                href="/"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={`flex items-center px-6 py-4 text-base font-semibold border-b border-gray-50 ${
+                  pathname === '/' ? 'text-pink-650 bg-pink-50/50' : 'text-gray-600'
+                }`}
+              >
+                <Home className="w-5 h-5 mr-3" />
+                Home
+              </Link>
+              <Link
+                href="/matches"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={`flex items-center px-6 py-4 text-base font-semibold border-b border-gray-50 ${
+                  pathname === '/matches' ? 'text-pink-650 bg-pink-50/50' : 'text-gray-600'
+                }`}
+              >
+                <Heart className="w-5 h-5 mr-3" />
+                Matches
+              </Link>
+              <Link
+                href="/chat"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={`flex items-center px-6 py-4 text-base font-semibold border-b border-gray-50 ${
+                  pathname === '/chat' ? 'text-pink-650 bg-pink-50/50' : 'text-gray-600'
+                }`}
+              >
+                <MessageSquare className="w-5 h-5 mr-3" />
+                Mensagens
+              </Link>
+            </>
+          ) : (
+            <>
+              <button 
+                onClick={() => { setIsMobileMenuOpen(false); onLoginClick(); }}
+                className="flex items-center px-6 py-4 text-base font-semibold border-b border-gray-50 text-gray-600 w-full text-left text-left"
+              >
+                Entrar
+              </button>
+              <button 
+                onClick={() => { setIsMobileMenuOpen(false); onRegisterClick(); }}
+                className="flex items-center px-6 py-4 text-base font-semibold border-b border-gray-50 text-pink-650 w-full text-left"
+              >
+                Cadastre-se
+              </button>
+            </>
+          )}
+
           <a
             href="/blog"
             target="_blank"
@@ -386,7 +413,8 @@ const Header: React.FC<HeaderProps> = ({
             <BookOpen className="w-5 h-5 mr-3" />
             Blog
           </a>
-          {!user?.isPremium && (
+
+          {isAuthenticated && !user?.isPremium && (
             <div className="px-6 pt-4">
               <button
                 onClick={() => { setIsMobileMenuOpen(false); router.push('/plans'); }}
