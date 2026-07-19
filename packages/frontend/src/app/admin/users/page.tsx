@@ -65,7 +65,7 @@ export default function AdminUsersPage() {
       if (search) params.set("search", search);
       if (statusFilter !== "all") params.set("status", statusFilter);
 
-      const token = localStorage.getItem("token") || "";
+      const token = localStorage.getItem("sweet_access_token") || "";
       const res = await fetch(`${API}/admin/users?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });

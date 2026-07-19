@@ -54,7 +54,7 @@ export default function AdminCommunicationsPage() {
   const [formPushTitle, setFormPushTitle] = useState("");
   const [formPushBody, setFormPushBody] = useState("");
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
+  const token = typeof window !== "undefined" ? localStorage.getItem("sweet_access_token") || "" : "";
 
   const fetchCampaigns = useCallback(async () => {
     setLoading(true);

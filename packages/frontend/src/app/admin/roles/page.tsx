@@ -56,7 +56,7 @@ export default function AdminRolesPage() {
   const [formDesc, setFormDesc] = useState("");
   const [formPermissions, setFormPermissions] = useState<Record<string, boolean>>({});
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
+  const token = typeof window !== "undefined" ? localStorage.getItem("sweet_access_token") || "" : "";
 
   const fetchRoles = useCallback(async () => {
     setLoading(true);

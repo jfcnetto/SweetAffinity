@@ -41,7 +41,7 @@ export default function AdminFinancePage() {
   const [period, setPeriod] = useState("30d");
   const [typeFilter, setTypeFilter] = useState("all");
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
+  const token = typeof window !== "undefined" ? localStorage.getItem("sweet_access_token") || "" : "";
 
   const fetchFinance = useCallback(async () => {
     setLoading(true);

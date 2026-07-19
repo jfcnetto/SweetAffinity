@@ -42,7 +42,7 @@ export default function UserCrmPage() {
   const [savingNote, setSavingNote] = useState(false);
   const [activeTab, setActiveTab] = useState<"notes" | "finance" | "subscriptions" | "access">("notes");
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
+  const token = typeof window !== "undefined" ? localStorage.getItem("sweet_access_token") || "" : "";
 
   const fetchCrm = useCallback(async () => {
     setLoading(true);

@@ -59,7 +59,7 @@ export default function AdminAiPage() {
   const [period, setPeriod] = useState("30d");
   const [activeView, setActiveView] = useState<"logs" | "budgets">("logs");
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
+  const token = typeof window !== "undefined" ? localStorage.getItem("sweet_access_token") || "" : "";
 
   const fetchData = useCallback(async () => {
     setLoading(true);
