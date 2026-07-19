@@ -16,7 +16,9 @@ export const apiRequest = async (endpoint: string, options: RequestInit = {}) =>
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || 'Erro de comunicação com o servidor.');
+    const errMsg = errorData.message || 'Erro de comunicação com o servidor.';
+    const detailMsg = errorData.details || errorData.error || '';
+    throw new Error(detailMsg ? `${errMsg} - Detalhes: ${detailMsg}` : errMsg);
   }
 
   return response.json();

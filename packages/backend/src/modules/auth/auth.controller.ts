@@ -108,7 +108,12 @@ export async function authRoutes(app: any) {
       if (err.message === "EMAIL_ALREADY_EXISTS") {
         return reply.status(409).send({ message: "E-mail já cadastrado." });
       }
-      throw err; // outros erros viram 500 pelo Fastify
+      app.log.error("Erro no registro:", err);
+      return reply.status(500).send({ 
+        message: "Erro interno no servidor ao registrar.",
+        error: err.message,
+        details: err.detail || err.cause?.message || String(err)
+      });
     }
   });
 

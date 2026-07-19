@@ -9,6 +9,7 @@ import {
   adminUsers,
   subscriptions,
   profileModerationQueue,
+  userSpecialAccess,
 } from "../db/schema.js";
 import { eq, desc, count, and, isNull, gte, lte } from "drizzle-orm";
 
@@ -143,6 +144,81 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
       return reply.send(updated);
     } catch (error) {
       if (!reply.sent) return reply.status(500).send({ message: "Erro ao atualizar status." });
+    }
+  });
+
+  // =============================================================================
+  // PATCH /admin/users/:id/premium — Conceder/Remover Premium
+  // =============================================================================
+  fastify.patch("/users/:id/premium", async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const adminId = await requireAdmin(request, reply);
+      const { id } = request.params as { id: string };
+      const { isPremium } = request.body as { isPremium: boolean };
+
+      const [updated] = await db
+        .update(users)
+        .set({ isPremium })
+        .where(eq(users.id, id))
+        .returning();
+
+      if (!updated) return reply.status(404).send({ message: "Usuário não encontrado." });
+
+      await db.insert(auditLogs).values({
+        adminId,
+        action: "update_user_premium",
+        entity: "user",
+        entityId: id,
+        details: { isPremium },
+      });
+
+      return reply.send(updated);
+    } catch (error) {
+      if (!reply.sent) return reply.status(500).send({ message: "Erro ao atualizar premium." });
+    }
+  });
+
+  // =============================================================================
+  // POST /admin/users/:id/special-access — Conceder Acesso Especial (ex: Vitalício)
+  // =============================================================================
+  fastify.post("/users/:id/special-access", async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const adminId = await requireAdmin(request, reply);
+      const { id } = request.params as { id: string };
+      const { accessType, reason, validUntil } = request.body as {
+        accessType: 'lifetime' | 'free_premium' | 'vip' | 'tester' | 'influencer';
+        reason?: string;
+        validUntil?: string | null;
+      };
+
+      const [special] = await db
+        .insert(userSpecialAccess)
+        .values({
+          userId: id,
+          accessType,
+          reason: reason || "Concedido pelo Administrador",
+          grantedBy: adminId,
+          validUntil: validUntil ? new Date(validUntil) : null,
+          isActive: true,
+        })
+        .returning();
+
+      // Se for vitalício ou free_premium, ativa o flag isPremium do usuário também
+      if (accessType === "lifetime" || accessType === "free_premium" || accessType === "vip") {
+        await db.update(users).set({ isPremium: true }).where(eq(users.id, id));
+      }
+
+      await db.insert(auditLogs).values({
+        adminId,
+        action: "grant_special_access",
+        entity: "user",
+        entityId: id,
+        details: { accessType, reason },
+      });
+
+      return reply.status(201).send(special);
+    } catch (error) {
+      if (!reply.sent) return reply.status(500).send({ message: "Erro ao conceder acesso especial." });
     }
   });
 

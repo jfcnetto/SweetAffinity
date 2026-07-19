@@ -197,7 +197,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, initialMode, onRegistrat
                 onRegistrationComplete(profileType as any);
             }
         } catch (error: any) {
-            const msg = error.response?.data?.message || 'Erro de conexão com o servidor.';
+            const data = error.response?.data || {};
+            const baseMsg = data.message || 'Erro de conexão com o servidor.';
+            const details = data.details || data.error || '';
+            const msg = details ? `${baseMsg} - Detalhes: ${details}` : baseMsg;
             setRegisterError(msg);
             toast.error(msg);
         }
