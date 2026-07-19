@@ -6,6 +6,28 @@ import { eq } from "drizzle-orm";
 import axios from "axios";
 import { EmailService } from "../../services/EmailService.js";
 
+const DISPOSABLE_DOMAINS = new Set([
+  "temp-mail.org", "yopmail.com", "mailinator.com", "guerrillamail.com", 
+  "guerrillamail.de", "guerrillamail.net", "guerrillamail.org", 
+  "guerrillamailblock.com", "guerrillamail.biz", "sharklasers.com", 
+  "grr.la", "pokemail.net", "dispostable.com", "tempmail.plus", 
+  "crazymailing.com", "10minutemail.com", "trashmail.com", 
+  "getairmail.com", "maildrop.cc", "jetable.org", "tempmail.com",
+  "temp-mail.ru", "tempmailaddress.com"
+]);
+
+function isDisposableEmail(email: string): boolean {
+  if (!email) return false;
+  const parts = email.toLowerCase().split("@");
+  if (parts.length < 2) return false;
+  const domain = parts[1].trim();
+  if (DISPOSABLE_DOMAINS.has(domain)) return true;
+  if (domain.includes("tempmail") || domain.includes("temp-mail") || domain.includes("disposable")) {
+    return true;
+  }
+  return false;
+}
+
 export async function authRoutes(app: any) {
 
   // =====================================================
@@ -16,6 +38,10 @@ export async function authRoutes(app: any) {
 
     if (!email || !password) {
       return reply.status(400).send({ message: "E-mail e senha são obrigatórios." });
+    }
+
+    if (isDisposableEmail(email)) {
+      return reply.status(400).send({ message: "E-mails temporários ou descartáveis não são permitidos." });
     }
 
     if (password.length < 8) {
