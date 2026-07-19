@@ -13,6 +13,13 @@ export class EmailService {
 
     const apiKey = process.env.RESEND_API_KEY;
     if (apiKey && apiKey !== "your_resend_api_key" && !apiKey.includes("dummy") && !apiKey.includes("12345")) {
+      const isSandboxSender = (process.env.EMAIL_FROM || "onboarding@resend.dev") === "onboarding@resend.dev";
+      if (isSandboxSender && email.toLowerCase().trim() !== "jfcnetto@gmail.com") {
+        console.log(`\nℹ️ [SANDBOX] Envio de e-mail pulado para ${email} para evitar bloqueio da Resend.`);
+        console.log(`🔗 Link de Verificação para Copiar: ${verificationLink}\n`);
+        return;
+      }
+
       try {
         const transporter = nodemailer.createTransport({
           host: "smtp.resend.com",
