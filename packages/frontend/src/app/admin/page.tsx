@@ -223,7 +223,7 @@ export default function AdminCRMDashboard() {
                   { label: 'Controle de IA', href: '/admin/ai', icon: Cpu, color: 'bg-blue-50 text-blue-700 border-blue-100' },
                   { label: 'Acessos Especiais', href: '/admin/access', icon: Shield, color: 'bg-purple-50 text-purple-700 border-purple-100' },
                   { label: 'Campanha', href: '/admin/communications', icon: MessageSquare, color: 'bg-pink-50 text-pink-700 border-pink-100' },
-                  { label: 'Usuários CRM', href: '/admin/users', icon: Users, color: 'bg-gray-50 text-gray-700 border-gray-200' },
+                  { label: 'Usuários', href: '/admin/users', icon: Users, color: 'bg-gray-50 text-gray-700 border-gray-200' },
                   { label: 'Configurações', href: '/admin/settings', icon: Settings, color: 'bg-amber-50 text-amber-700 border-amber-100' },
                   { label: 'Banir Usuário', href: '/admin/users?action=ban', icon: BanIcon, color: 'bg-red-50 text-red-700 border-red-100' },
                 ].map((action) => (

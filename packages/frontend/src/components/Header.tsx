@@ -262,7 +262,7 @@ const Header: React.FC<HeaderProps> = ({
                           onClick={() => setShowUserMenu(false)}
                           className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-650 transition-colors"
                         >
-                          Painel Admin
+                          Painel Administrativo
                         </Link>
                       )}
                       

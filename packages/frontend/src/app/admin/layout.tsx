@@ -19,11 +19,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const navItems = [
     { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
-    { name: "Usuários & CRM", href: "/admin/users", icon: Users },
-    { name: "Financeiro & Assinaturas", href: "/admin/finance", icon: CreditCard },
+    { name: "Usuários", href: "/admin/users", icon: Users },
+    { name: "Controle Financeiro", href: "/admin/finance", icon: CreditCard },
     { name: "Controle de IA", href: "/admin/ai", icon: Bot },
     { name: "Comunicações", href: "/admin/communications", icon: Mail },
-    { name: "Acessos & Roles", href: "/admin/roles", icon: ShieldCheck },
+    { name: "Gerenciamento de permissões", href: "/admin/roles", icon: ShieldCheck },
     { name: "Configurações", href: "/admin/settings", icon: Settings },
     { name: "Gerenciar Blog", href: "/admin/blog", icon: Sparkles },
   ];
