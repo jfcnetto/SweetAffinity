@@ -93,6 +93,25 @@ export default function AdminUsersPage() {
     fetchUsers();
   }, [fetchUsers]);
 
+  const handleUpdateStatus = async (userId: string, newStatus: string) => {
+    if (newStatus === "banned" && !confirm("Tem certeza que deseja banir este usuário?")) {
+      return;
+    }
+    try {
+      const token = localStorage.getItem("sweet_access_token") || "";
+      const res = await fetch(`${API}/admin/users/${userId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (res.ok) {
+        fetchUsers();
+      }
+    } catch (err) {
+      console.error("Erro ao atualizar status:", err);
+    }
+  };
+
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
   return (
@@ -264,10 +283,15 @@ export default function AdminUsersPage() {
                             <Eye className="w-4 h-4" />
                           </Link>
                           <button
-                            className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 dark:hover:text-red-400 transition-colors"
-                            title="Banir usuário"
+                            onClick={() => handleUpdateStatus(user.id, user.status === "banned" ? "active" : "banned")}
+                            className={`p-2 rounded-lg transition-colors ${
+                              user.status === "banned"
+                                ? "text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50"
+                                : "text-gray-400 hover:text-red-600 hover:bg-red-50"
+                            }`}
+                            title={user.status === "banned" ? "Reativar usuário" : "Banir usuário"}
                           >
-                            <Ban className="w-4 h-4" />
+                            {user.status === "banned" ? <UserCheck className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
                           </button>
                           <button className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 dark:hover:text-gray-300 transition-colors">
                             <MoreVertical className="w-4 h-4" />
