@@ -79,6 +79,21 @@ export default function UserCrmPage() {
     }
   };
 
+  const handleUpdateStatus = async (newStatus: string) => {
+    try {
+      const res = await fetch(`${API}/admin/users/${userId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (res.ok) {
+        fetchCrm();
+      }
+    } catch (err) {
+      console.error("Erro ao atualizar status:", err);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -165,12 +180,31 @@ export default function UserCrmPage() {
             <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/40 transition-colors">
               <Shield className="w-3.5 h-3.5" /> Perfil Vitalício
             </button>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/40 transition-colors">
-              <UserCheck className="w-3.5 h-3.5" /> Reativar
-            </button>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-300 dark:hover:bg-red-900/40 transition-colors">
-              <Ban className="w-3.5 h-3.5" /> Banir
-            </button>
+            
+            {user.status === "pending" ? (
+              <button 
+                onClick={() => handleUpdateStatus("active")}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/40 transition-colors"
+              >
+                <UserCheck className="w-3.5 h-3.5" /> Aprovar Cadastro
+              </button>
+            ) : user.status !== "active" ? (
+              <button 
+                onClick={() => handleUpdateStatus("active")}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/40 transition-colors"
+              >
+                <UserCheck className="w-3.5 h-3.5" /> Reativar
+              </button>
+            ) : null}
+
+            {user.status !== "banned" && (
+              <button 
+                onClick={() => handleUpdateStatus("banned")}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-300 dark:hover:bg-red-900/40 transition-colors"
+              >
+                <Ban className="w-3.5 h-3.5" /> Banir
+              </button>
+            )}
           </div>
         </div>
       </div>

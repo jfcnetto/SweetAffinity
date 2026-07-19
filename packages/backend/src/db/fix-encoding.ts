@@ -46,7 +46,7 @@ function fixEncoding(text: string | null): string | null {
 
 async function run() {
   const { db } = await import("./index.js");
-  const { profiles, blogPosts } = await import("./schema.js");
+  const { profiles, blogPosts, notifications } = await import("./schema.js");
   const { eq } = await import("drizzle-orm");
   
   console.log("Iniciando correção de codificação no banco de dados...");
@@ -66,7 +66,7 @@ async function run() {
 
     for (const field of textFields) {
       const val = profile[field];
-      if (typeof val === "string" && /[├]/.test(val)) {
+      if (typeof val === "string" && (/[├]/.test(val) || /Ô/.test(val))) {
         updated[field] = fixEncoding(val);
         needsUpdate = true;
       }
@@ -94,7 +94,7 @@ async function run() {
 
       for (const field of textFields) {
         const val = post[field];
-        if (typeof val === "string" && /[├]/.test(val)) {
+        if (typeof val === "string" && (/[├]/.test(val) || /Ô/.test(val))) {
           updated[field] = fixEncoding(val);
           needsUpdate = true;
         }
@@ -109,6 +109,37 @@ async function run() {
     console.warn("Tabela blog_posts não existe ou falhou ao ler:", err.message);
   }
   console.log(`Posts de blog corrigidos: ${blogCount}`);
+
+  // 3. Corrigir Notificações
+  console.log("Corrigindo notificações...");
+  let notifCount = 0;
+  try {
+    const allNotifs = await db.select().from(notifications);
+    for (const notif of allNotifs) {
+      let needsUpdate = false;
+      const updated: any = {};
+
+      const textFields: (keyof typeof notifications.$inferSelect)[] = [
+        'title', 'body'
+      ];
+
+      for (const field of textFields) {
+        const val = notif[field];
+        if (typeof val === "string" && (/[├]/.test(val) || /Ô/.test(val))) {
+          updated[field] = fixEncoding(val);
+          needsUpdate = true;
+        }
+      }
+
+      if (needsUpdate) {
+        await db.update(notifications).set(updated).where(eq(notifications.id, notif.id));
+        notifCount++;
+      }
+    }
+  } catch (err: any) {
+    console.warn("Tabela notifications não existe ou falhou ao ler:", err.message);
+  }
+  console.log(`Notificações corrigidas: ${notifCount}`);
 
   console.log(`Correção finalizada. Total de tabelas limpas.`);
   process.exit(0);
