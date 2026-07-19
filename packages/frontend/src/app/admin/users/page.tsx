@@ -69,10 +69,10 @@ export default function AdminUsersPage() {
       const res = await fetch(`${API}/admin/users?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error("Falha ao buscar usuários");
       const data = await res.json();
-      setUsers(data.users ?? data ?? []);
-      setTotal(data.total ?? data.length ?? 0);
+      const userList = data.data ?? data.users ?? (Array.isArray(data) ? data : []);
+      setUsers(userList);
+      setTotal(data.total ?? userList.length ?? 0);
     } catch (err) {
       console.error(err);
     } finally {
@@ -194,8 +194,10 @@ export default function AdminUsersPage() {
                   </td>
                 </tr>
               ) : (
-                users.map((user) => {
-                  const role = roleLabels[user.role] ?? roleLabels.free;
+                users.map((user: any) => {
+                  const role = user.profileType === "admin" 
+                    ? roleLabels.admin 
+                    : (user.isPremium ? roleLabels.premium : roleLabels.free);
                   return (
                     <tr
                       key={user.id}
@@ -204,11 +206,11 @@ export default function AdminUsersPage() {
                       <td className="py-3.5 px-5">
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-pink-400 to-purple-500 flex items-center justify-center text-white font-bold text-xs shrink-0">
-                            {(user.display_name || user.email).charAt(0).toUpperCase()}
+                            {(user.displayName || user.email).charAt(0).toUpperCase()}
                           </div>
                           <div className="min-w-0">
                             <p className="font-medium text-gray-900 dark:text-white truncate">
-                              {user.display_name || "Sem nome"}
+                              {user.displayName || "Sem nome"}
                             </p>
                             <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                               {user.email}
@@ -233,7 +235,7 @@ export default function AdminUsersPage() {
                           : "—"}
                       </td>
                       <td className="py-3.5 px-5 hidden lg:table-cell text-gray-500 dark:text-gray-400">
-                        {new Date(user.created_at).toLocaleDateString("pt-BR")}
+                        {user.createdAt ? new Date(user.createdAt).toLocaleDateString("pt-BR") : "—"}
                       </td>
                       <td className="py-3.5 px-5">
                         <div className="flex items-center justify-end gap-1">
