@@ -13,15 +13,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   const router = useRouter();
   const pathname = usePathname();
 
-  const isAdminRoute = pathname?.startsWith('/admin');
-
-  if (isAdminRoute) {
-    return (
-      <div className="h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
-        {children}
-      </div>
-    );
-  }
+  // Admin pages will also use the standard Header and Footer
 
   const openAuthModal = (mode: 'login' | 'register') => {
     setAuthMode(mode);
