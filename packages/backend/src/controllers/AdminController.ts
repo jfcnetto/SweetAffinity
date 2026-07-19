@@ -92,14 +92,24 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
           lastLoginAt: users.lastLoginAt,
           displayName: profiles.displayName,
           relationshipType: profiles.relationshipType,
+          city: profiles.city,
+          state: profiles.state,
+          primaryPhotoPath: photos.storagePath,
         })
         .from(users)
         .leftJoin(profiles, eq(users.id, profiles.id))
+        .leftJoin(photos, and(eq(users.id, photos.userId), eq(photos.isPrimary, true)))
         .orderBy(desc(users.createdAt))
         .limit(limitNum)
         .offset(offset);
 
-      return reply.send({ data: result, page: pageNum, limit: limitNum });
+      const MINIO_URL = process.env.MINIO_PUBLIC_URL || "https://pub-965c3dcee438453785ccea7e90c84b6b.r2.dev";
+      const mapped = result.map((r) => ({
+        ...r,
+        primaryPhotoUrl: r.primaryPhotoPath ? `${MINIO_URL}/${r.primaryPhotoPath}` : null,
+      }));
+
+      return reply.send({ data: mapped, page: pageNum, limit: limitNum });
     } catch (error) {
       if (!reply.sent) return reply.status(500).send({ message: "Erro ao listar usuários." });
     }

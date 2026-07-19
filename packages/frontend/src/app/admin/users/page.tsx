@@ -49,11 +49,20 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
   const limit = 20;
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [search]);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -62,7 +71,7 @@ export default function AdminUsersPage() {
         page: String(page),
         limit: String(limit),
       });
-      if (search) params.set("search", search);
+      if (debouncedSearch) params.set("search", debouncedSearch);
       if (statusFilter !== "all") params.set("status", statusFilter);
 
       const token = localStorage.getItem("sweet_access_token") || "";
@@ -78,7 +87,7 @@ export default function AdminUsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, statusFilter]);
+  }, [page, debouncedSearch, statusFilter]);
 
   useEffect(() => {
     fetchUsers();
@@ -205,17 +214,25 @@ export default function AdminUsersPage() {
                     >
                       <td className="py-3.5 px-5">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-pink-400 to-purple-500 flex items-center justify-center text-white font-bold text-xs shrink-0">
-                            {(user.displayName || user.email).charAt(0).toUpperCase()}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="font-medium text-gray-900 dark:text-white truncate">
+                          {user.primaryPhotoUrl ? (
+                            <img 
+                              src={user.primaryPhotoUrl} 
+                              alt={user.displayName || "Avatar"} 
+                              className="w-9 h-9 rounded-full object-cover shrink-0 border border-gray-100"
+                            />
+                          ) : (
+                            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-pink-400 to-purple-500 flex items-center justify-center text-white font-bold text-xs shrink-0">
+                              {(user.displayName || user.email).charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          <Link href={`/admin/users/${user.id}`} className="min-w-0 group hover:underline">
+                            <p className="font-medium text-gray-900 dark:text-white truncate group-hover:text-purple-600 transition-colors">
                               {user.displayName || "Sem nome"}
                             </p>
                             <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                               {user.email}
                             </p>
-                          </div>
+                          </Link>
                         </div>
                       </td>
                       <td className="py-3.5 px-5">
